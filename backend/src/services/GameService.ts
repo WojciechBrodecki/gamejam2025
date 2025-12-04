@@ -114,7 +114,7 @@ export class GameService {
   }
 
   private startRoundUpdates(): void {
-    const updateInterval = setInterval(() => {
+    const updateInterval = setInterval(async () => {
       if (!this.currentRound || this.currentRound.status === 'finished' || !this.currentRound.endTime) {
         clearInterval(updateInterval);
         return;
@@ -122,11 +122,15 @@ export class GameService {
 
       const timeRemaining = Math.max(0, this.currentRound.endTime.getTime() - Date.now());
       
+      // Get unique players who placed bets
+      const bettingPlayers = await this.getBettingPlayers();
+      
       this.wsService?.broadcast({
         type: 'ROUND_UPDATE',
         payload: {
           round: this.formatRound(this.currentRound),
           timeRemaining,
+          players: bettingPlayers,
         },
         timestamp: Date.now(),
       });
@@ -135,6 +139,35 @@ export class GameService {
         clearInterval(updateInterval);
       }
     }, 1000);
+  }
+
+  private async getBettingPlayers(): Promise<{ id: string; username: string; avatar: string | null; totalBet: number }[]> {
+    if (!this.currentRound) return [];
+
+    // Aggregate bets by player
+    const playerBets = new Map<string, { username: string; totalBet: number }>();
+    for (const bet of this.currentRound.bets) {
+      const existing = playerBets.get(bet.playerId);
+      if (existing) {
+        existing.totalBet += bet.amount;
+      } else {
+        playerBets.set(bet.playerId, { username: bet.playerUsername, totalBet: bet.amount });
+      }
+    }
+
+    // Fetch player details (for avatar)
+    const players: { id: string; username: string; avatar: string | null; totalBet: number }[] = [];
+    for (const [playerId, data] of playerBets) {
+      const player = await Player.findOne({ id: playerId });
+      players.push({
+        id: playerId,
+        username: data.username,
+        avatar: player?.avatar || null,
+        totalBet: data.totalBet,
+      });
+    }
+
+    return players;
   }
 
   async placeBet(playerId: string, amount: number): Promise<{ success: boolean; message: string }> {
