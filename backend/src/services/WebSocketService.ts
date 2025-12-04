@@ -1,5 +1,6 @@
 import { WebSocket, WebSocketServer } from 'ws';
-import { Server } from 'http';
+import { Server, IncomingMessage } from 'http';
+import { Socket } from 'net';
 import { gameService } from './GameService';
 
 interface ExtendedWebSocket extends WebSocket {
@@ -13,13 +14,14 @@ export class WebSocketService {
   private clients: Set<ExtendedWebSocket> = new Set();
 
   constructor(server: Server) {
-    this.wss = new WebSocketServer({ server, path: '/ws' });
+    // Use noServer mode for manual upgrade handling
+    this.wss = new WebSocketServer({ server });
     this.init();
   }
 
   private init(): void {
     this.wss.on('connection', (ws: ExtendedWebSocket) => {
-      console.log('New WebSocket connection');
+      console.log('New WebSocket connection established');
       ws.isAlive = true;
       this.clients.add(ws);
 
@@ -41,8 +43,8 @@ export class WebSocketService {
         }
       });
 
-      ws.on('close', () => {
-        console.log('WebSocket connection closed');
+      ws.on('close', (code, reason) => {
+        console.log(`WebSocket connection closed. Code: ${code}, Reason: ${reason.toString()}`);
         this.clients.delete(ws);
         
         if (ws.playerId) {
@@ -64,6 +66,13 @@ export class WebSocketService {
         }
         console.error('WebSocket error:', error.message);
         this.clients.delete(ws);
+      });
+      
+      // Send a welcome message to confirm connection is stable
+      this.sendToClient(ws, {
+        type: 'CONNECTED',
+        payload: { message: 'WebSocket connection established' },
+        timestamp: Date.now(),
       });
     });
 
