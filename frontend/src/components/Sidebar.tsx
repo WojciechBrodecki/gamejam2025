@@ -31,8 +31,8 @@ interface SidebarProps {
   rooms: Room[];
   selectedRoomId: string;
   onRoomSelect: (roomId: string) => void;
-  currentGame: 'grand-wager' | 'test-gra';
-  onGameChange: (game: 'grand-wager' | 'test-gra') => void;
+  currentGame: 'grand-wager' | 'timber-fever';
+  onGameChange: (game: 'grand-wager' | 'timber-fever') => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -52,9 +52,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     onClose();
   };
 
-  const handleGameClick = (game: 'grand-wager' | 'test-gra') => {
+  const handleGameClick = (game: 'grand-wager' | 'timber-fever') => {
     onGameChange(game);
-    if (game === 'test-gra') {
+    if (game === 'timber-fever') {
       onClose();
     }
   };
@@ -80,11 +80,11 @@ const Sidebar: React.FC<SidebarProps> = ({
               <GameName>GRAND WAGER</GameName>
             </GameItem>
             <GameItem 
-              $active={currentGame === 'test-gra'}
-              onClick={() => handleGameClick('test-gra')}
+              $active={currentGame === 'timber-fever'}
+              onClick={() => handleGameClick('timber-fever')}
             >
-              <GameIcon>TG</GameIcon>
-              <GameName>TEST_GRA</GameName>
+              <GameIcon>🪓</GameIcon>
+              <GameName>TIMBER FEVER</GameName>
             </GameItem>
           </GameList>
         </SidebarSection>

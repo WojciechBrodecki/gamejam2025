@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { useWebSocket } from './hooks/useWebSocket';
 import { GameState, Player } from './types';
 import {
@@ -8,16 +10,12 @@ import {
   NotFound,
   LoginScreen,
   Room,
+  TimberFever,
 } from './components';
 import {
   AppWrapper,
   MainContent,
-  ErrorToast,
   ConnectionDot,
-  TestGraPlaceholder,
-  PlaceholderIcon,
-  PlaceholderTitle,
-  PlaceholderText,
 } from './styles/App.styles';
 
 const defaultRooms: Room[] = [
@@ -28,11 +26,11 @@ const defaultRooms: Room[] = [
 ];
 
 const App: React.FC = () => {
-  const { isConnected, lastMessage, sendMessage } = useWebSocket();
+  const { isConnected, lastMessage, sendMessage, login, disconnect } = useWebSocket();
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [player, setPlayer] = useState<Player | null>(null);
-  const [currentGame, setCurrentGame] = useState<'grand-wager' | 'test-gra'>('grand-wager');
+  const [currentGame, setCurrentGame] = useState<'grand-wager' | 'timber-fever'>('grand-wager');
   const [selectedRoom, setSelectedRoom] = useState('open-1');
   const [rooms, setRooms] = useState<Room[]>(defaultRooms);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -47,12 +45,34 @@ const App: React.FC = () => {
   const [betAmount, setBetAmount] = useState<string>('10');
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [winner, setWinner] = useState<{ playerId: string; username: string; amount: number } | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [roundStatus, setRoundStatus] = useState<'waiting' | 'active' | 'finished'>('waiting');
 
   useEffect(() => {
     if (!lastMessage) return;
 
     switch (lastMessage.type) {
+      case 'CONNECTED':
+        // Set round status from CONNECTED message
+        if (lastMessage.payload.roundStatus) {
+          setRoundStatus(lastMessage.payload.roundStatus);
+        }
+        // Store playerId from CONNECTED (username matches our login)
+        if (lastMessage.payload.username) {
+          setGameState(prev => ({
+            ...prev,
+            playerId: lastMessage.payload.playerId || prev.playerId,
+          }));
+        }
+        break;
+
+      case 'ROUND_WAITING':
+        setRoundStatus('waiting');
+        setGameState(prev => ({
+          ...prev,
+          currentRound: lastMessage.payload.round,
+        }));
+        break;
+
       case 'SYNC_STATE':
         setGameState({
           currentRound: lastMessage.payload.currentRound,
@@ -75,6 +95,14 @@ const App: React.FC = () => {
         break;
 
       case 'ROUND_START':
+        setRoundStatus('active');
+        setGameState(prev => ({
+          ...prev,
+          currentRound: lastMessage.payload.round,
+        }));
+        setTimeRemaining(lastMessage.payload.timeRemaining);
+        break;
+
       case 'ROUND_UPDATE':
         setGameState(prev => ({
           ...prev,
@@ -98,6 +126,7 @@ const App: React.FC = () => {
         break;
 
       case 'ROUND_END':
+        setRoundStatus('finished');
         setWinner({
           playerId: lastMessage.payload.winner.playerId,
           username: lastMessage.payload.winner.username,
@@ -106,18 +135,27 @@ const App: React.FC = () => {
         break;
 
       case 'PLAYER_JOINED':
-        if (lastMessage.payload.playerId === gameState.playerId) {
+        // Set player data from PLAYER_JOINED - includes balance
+        // Check by username since we might not have playerId yet
+        const joinedUsername = lastMessage.payload.username;
+        if (lastMessage.payload.playerId === gameState.playerId || 
+            (player && player.username === joinedUsername) ||
+            (!player && joinedUsername)) {
           setPlayer({
             id: lastMessage.payload.playerId,
             username: lastMessage.payload.username,
             balance: lastMessage.payload.balance,
           });
+          setGameState(prev => ({
+            ...prev,
+            playerId: lastMessage.payload.playerId,
+          }));
         }
         break;
 
       case 'ERROR':
-        setError(lastMessage.payload.message);
-        setTimeout(() => setError(null), 5000);
+        console.error('Server ERROR:', lastMessage.payload);
+        toast.error(lastMessage.payload.message);
         break;
     }
   }, [lastMessage, player, sendMessage, gameState.playerId]);
@@ -138,16 +176,22 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [gameState.currentRound]);
 
-  const handleLogin = (username: string) => {
-    sendMessage({
-      type: 'JOIN_GAME',
-      payload: { username },
-      timestamp: Date.now(),
-    });
+  const handleLogin = async (username: string) => {
+    console.log('handleLogin called with username:', username);
+    
+    const result = await login(username);
+    
+    if (!result.success) {
+      toast.error(result.error || 'Nie udało się zalogować');
+      return;
+    }
+    
     setIsLoggedIn(true);
+    toast.success('Zalogowano pomyślnie!');
   };
 
   const handleLogout = () => {
+    disconnect();
     setIsLoggedIn(false);
     setPlayer(null);
     setGameState({
@@ -156,18 +200,24 @@ const App: React.FC = () => {
       players: [],
       playerId: null,
     });
-    window.location.reload();
   };
 
   const handlePlaceBet = () => {
+    console.log('handlePlaceBet called, isConnected:', isConnected);
+    
+    if (!isConnected) {
+      toast.error('Brak połączenia z serwerem');
+      return;
+    }
+
     const amount = parseInt(betAmount, 10);
     if (isNaN(amount) || amount <= 0) {
-      setError('Wprowadź prawidłową kwotę');
+      toast.error('Wprowadź prawidłową kwotę');
       return;
     }
 
     if (player && amount > player.balance) {
-      setError('Niewystarczające środki');
+      toast.error('Niewystarczające środki');
       return;
     }
 
@@ -183,7 +233,7 @@ const App: React.FC = () => {
   };
 
   if (!isLoggedIn) {
-    return <LoginScreen isConnected={isConnected} onLogin={handleLogin} />;
+    return <LoginScreen onLogin={handleLogin} />;
   }
 
   return (
@@ -206,12 +256,6 @@ const App: React.FC = () => {
       />
 
       <MainContent>
-        {error && (
-          <ErrorToast>
-            {error}
-          </ErrorToast>
-        )}
-
         {currentGame === 'grand-wager' ? (
           <GrandWager
             player={player}
@@ -222,8 +266,8 @@ const App: React.FC = () => {
             onBetAmountChange={setBetAmount}
             onPlaceBet={handlePlaceBet}
             winner={winner}
+            roundStatus={roundStatus}
             onWinnerShown={() => {
-              // Po pokazaniu zwycięzcy, odśwież stan i wyczyść winner
               setTimeout(() => {
                 setWinner(null);
                 sendMessage({
@@ -235,15 +279,24 @@ const App: React.FC = () => {
             }}
           />
         ) : (
-          <TestGraPlaceholder>
-            <PlaceholderIcon>?</PlaceholderIcon>
-            <PlaceholderTitle>TEST_GRA</PlaceholderTitle>
-            <PlaceholderText>Ta gra jest jeszcze w przygotowaniu...</PlaceholderText>
-          </TestGraPlaceholder>
+          <TimberFever playerBalance={player?.balance || 1000} />
         )}
       </MainContent>
 
       <ConnectionDot $online={isConnected} />
+      
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+      />
     </AppWrapper>
   );
 };

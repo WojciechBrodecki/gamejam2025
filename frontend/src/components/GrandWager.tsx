@@ -27,6 +27,7 @@ interface GrandWagerProps {
   onBetAmountChange: (amount: string) => void;
   onPlaceBet: () => void;
   winner: Winner | null;
+  roundStatus: 'waiting' | 'active' | 'finished';
   onWinnerShown?: () => void;
 }
 
@@ -39,6 +40,7 @@ const GrandWager: React.FC<GrandWagerProps> = ({
   onBetAmountChange,
   onPlaceBet,
   winner,
+  roundStatus,
   onWinnerShown,
 }) => {
   const getPlayerTotalBet = (): number => {
@@ -62,6 +64,7 @@ const GrandWager: React.FC<GrandWagerProps> = ({
         timeRemaining={timeRemaining}
         currentPlayerId={player?.id || null}
         winner={winner}
+        roundId={currentRound?.id || null}
         onWinnerShown={onWinnerShown}
       />
 
@@ -72,7 +75,7 @@ const GrandWager: React.FC<GrandWagerProps> = ({
         playerBalance={player?.balance ?? 1000}
         playerTotalBet={getPlayerTotalBet()}
         playerChance={getPlayerChance()}
-        isDisabled={!currentRound || currentRound.status === 'finished' || !!winner || timeRemaining <= 0}
+        isDisabled={roundStatus === 'finished' || !!winner}
       />
     </GrandWagerWrapper>
   );

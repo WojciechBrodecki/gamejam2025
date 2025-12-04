@@ -21,7 +21,7 @@ export interface Round {
   winnerUsername?: string;
   winnerAmount?: number;
   casinoCommission?: number;
-  status: 'active' | 'finished';
+  status: 'waiting' | 'active' | 'finished';
 }
 
 export interface GameConfig {
@@ -39,6 +39,8 @@ export interface GameState {
 }
 
 export type WSMessageType = 
+  | 'CONNECTED'
+  | 'ROUND_WAITING'
   | 'ROUND_UPDATE'
   | 'BET_PLACED'
   | 'ROUND_END'

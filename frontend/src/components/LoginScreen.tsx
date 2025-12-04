@@ -12,22 +12,22 @@ import {
   LoginForm,
   InputGroup,
   LoginButton,
-  ConnectionIndicator,
-  StatusDot,
 } from '../styles/LoginScreen.styles';
 
 interface LoginScreenProps {
-  isConnected: boolean;
   onLogin: (username: string) => void;
 }
 
-const LoginScreen: React.FC<LoginScreenProps> = ({ isConnected, onLogin }) => {
+const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (username.trim()) {
-      onLogin(username.trim());
+    if (username.trim() && !isLoading) {
+      setIsLoading(true);
+      await onLogin(username.trim());
+      setIsLoading(false);
     }
   };
 
@@ -40,8 +40,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ isConnected, onLogin }) => {
         <FloatingCard $variant={2}>K</FloatingCard>
         <FloatingCard $variant={3}>Q</FloatingCard>
         <FloatingCard $variant={4}>J</FloatingCard>
-        <FloatingChip $variant={1}>●</FloatingChip>
-        <FloatingChip $variant={2}>●</FloatingChip>
       </LoginBackground>
 
       <LoginContainer>
@@ -63,27 +61,23 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ isConnected, onLogin }) => {
               onChange={(e) => setUsername(e.target.value)}
               autoFocus
               maxLength={20}
+              disabled={isLoading}
             />
           </InputGroup>
 
-          <LoginButton type="submit" disabled={!isConnected || !username.trim()}>
-            {isConnected ? (
+          <LoginButton type="submit" disabled={!username.trim() || isLoading}>
+            {isLoading ? (
+              <span>Logowanie...</span>
+            ) : (
               <>
                 <span>Wejdź do kasyna</span>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="9,6 15,12 9,18" />
                 </svg>
               </>
-            ) : (
-              <span>Łączenie z serwerem...</span>
             )}
           </LoginButton>
         </LoginForm>
-
-        <ConnectionIndicator $connected={isConnected}>
-          <StatusDot $connected={isConnected} />
-          <span>{isConnected ? 'Połączono z serwerem' : 'Łączenie...'}</span>
-        </ConnectionIndicator>
       </LoginContainer>
     </LoginPage>
   );

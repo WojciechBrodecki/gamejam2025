@@ -11,9 +11,11 @@ import {
   PoolLabel,
   PoolValue,
   WinnerOverlay,
+  WinnerIcon,
   WinnerTitle,
   WinnerName,
   WinnerAmount,
+  WinnerChance,
   PlayersLegend,
   PlayerLegendItem,
   PlayerPercent,
@@ -51,7 +53,21 @@ interface BetWheelProps {
   timeRemaining: number;
   currentPlayerId: string | null;
   winner: Winner | null;
+  roundId: string | null;
   onWinnerShown?: () => void;
+}
+
+// Deterministyczna funkcja hash - generuje tę samą liczbę dla tego samego stringa
+// Używamy prostego algorytmu hashowania który daje wartość 0-1
+function deterministicRandom(seed: string): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  // Normalizuj do zakresu 0-1
+  return Math.abs(hash % 10000) / 10000;
 }
 
 interface AggregatedBet {
@@ -68,11 +84,13 @@ const BetWheel: React.FC<BetWheelProps> = ({
   timeRemaining,
   currentPlayerId,
   winner,
+  roundId,
   onWinnerShown,
 }) => {
   const [isSpinning, setIsSpinning] = useState(false);
   const [targetRotation, setTargetRotation] = useState(0);
   const [showWinner, setShowWinner] = useState(false);
+  const [winnerInfo, setWinnerInfo] = useState<{ chance: number; color: string } | null>(null);
 
   // Agreguj zakłady per gracz
   const aggregatedBets = useMemo(() => {
@@ -104,6 +122,8 @@ const BetWheel: React.FC<BetWheelProps> = ({
   useEffect(() => {
     if (winner && aggregatedBets.length > 0) {
       // Znajdź pozycję zwycięzcy na kole
+      // Segmenty są rysowane od kąta 0 (który w SVG z offsetem -90 to góra)
+      // Liczymy kąt startowy segmentu zwycięzcy od pozycji 0
       let winnerStartAngle = 0;
       for (const player of aggregatedBets) {
         if (player.playerId === winner.playerId) {
@@ -112,32 +132,66 @@ const BetWheel: React.FC<BetWheelProps> = ({
         winnerStartAngle += (player.percent / 100) * 360;
       }
 
-      // Oblicz środek segmentu zwycięzcy
+      // Oblicz środek segmentu zwycięzcy (kąt od 0)
       const winnerPlayer = aggregatedBets.find(p => p.playerId === winner.playerId);
-      const winnerMidAngle = winnerStartAngle + ((winnerPlayer?.percent || 0) / 100) * 180;
+      const winnerSegmentSize = (winnerPlayer?.percent || 0) / 100 * 360;
+      const winnerMidAngle = winnerStartAngle + winnerSegmentSize / 2;
 
-      // Kręcimy koło - cel to pozycja gdzie wskaźnik pokazuje zwycięzcę (góra = 0 stopni)
-      // Więc musimy obrócić koło tak, żeby środek segmentu zwycięzcy był na górze
-      const spins = 5 + Math.random() * 3; // 5-8 pełnych obrotów
-      const finalRotation = spins * 360 + (360 - winnerMidAngle + 90);
+      // Zapisz info o zwycięzcy
+      if (winnerPlayer) {
+        setWinnerInfo({
+          chance: winnerPlayer.percent,
+          color: winnerPlayer.color,
+        });
+      }
 
-      setIsSpinning(true);
+      // Kręcimy koło - wskaźnik jest na górze (pozycja 0 stopni w układzie SVG z offsetem -90)
+      // Żeby środek segmentu zwycięzcy był pod wskaźnikiem, musimy obrócić koło
+      // o kąt równy winnerMidAngle (w kierunku przeciwnym do ruchu wskazówek zegara = ujemna rotacja)
+      // Ale CSS rotate obraca zgodnie z ruchem wskazówek, więc:
+      // finalRotation = pełne obroty + (360 - winnerMidAngle) żeby segment był na górze
       
-      // Po krótkim czasie zacznij zwalniać
+      // DETERMINISTYCZNE: używamy roundId do wygenerowania identycznej liczby obrotów u wszystkich
+      const seedValue = roundId ? deterministicRandom(roundId) : 0.5;
+      const spins = 3 + seedValue * 2; // 3-5 pełnych obrotów (deterministycznie)
+      
+      // Obrót żeby środek segmentu zwycięzcy znalazł się na górze (pod wskaźnikiem)
+      const rotationToWinner = 360 - winnerMidAngle;
+      const finalRotation = spins * 360 + rotationToWinner;
+
+      console.log('Winner calculation:', {
+        winnerStartAngle,
+        winnerSegmentSize,
+        winnerMidAngle,
+        rotationToWinner,
+        finalRotation,
+        winner: winner.username,
+      });
+
+      // Najpierw szybkie kręcenie
+      setIsSpinning(true);
+      setTargetRotation(0);
+      
+      // Po 500ms przejdź do płynnego zwalniania
       setTimeout(() => {
         setIsSpinning(false);
         setTargetRotation(finalRotation);
-      }, 2000);
+      }, 500);
 
-      // Pokaż zwycięzcę po zakończeniu animacji
+      // Pokaż zwycięzcę po zakończeniu animacji kręcenia (500ms + 5s transition)
       setTimeout(() => {
         setShowWinner(true);
+      }, 5500);
+
+      // Callback po pokazaniu zwycięzcy
+      setTimeout(() => {
         onWinnerShown?.();
-      }, 6000);
-    } else {
+      }, 8500);
+    } else if (!winner) {
       setIsSpinning(false);
       setTargetRotation(0);
       setShowWinner(false);
+      setWinnerInfo(null);
     }
   }, [winner, aggregatedBets, onWinnerShown]);
 
@@ -233,11 +287,17 @@ const BetWheel: React.FC<BetWheelProps> = ({
 
         {showWinner && winner && (
           <WinnerOverlay>
+            <WinnerIcon $color={winnerInfo?.color}>
+              {winner.username.charAt(0).toUpperCase()}
+            </WinnerIcon>
             <WinnerTitle $isYou={winner.playerId === currentPlayerId}>
               {winner.playerId === currentPlayerId ? 'WYGRAŁEŚ!' : 'WYGRYWA'}
             </WinnerTitle>
             <WinnerName>{winner.username}</WinnerName>
             <WinnerAmount>+${winner.amount.toFixed(2)}</WinnerAmount>
+            <WinnerChance>
+              Szansa: <span>{winnerInfo?.chance.toFixed(1)}%</span>
+            </WinnerChance>
           </WinnerOverlay>
         )}
       </WheelWrapper>

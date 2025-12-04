@@ -5,3 +5,4 @@ export { default as NotFound } from './NotFound';
 export { default as LoginScreen } from './LoginScreen';
 export { default as BetWheel } from './BetWheel';
 export { default as BetPanel } from './BetPanel';
+export { default as TimberFever } from './TimberFever';
