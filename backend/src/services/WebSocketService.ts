@@ -124,7 +124,14 @@ export class WebSocketService {
         payload: { 
           message: 'WebSocket connection established', 
           username: nickname,
-          roundStatus: currentRound?.status || 'waiting',
+          round: currentRound ? {
+            id: currentRound.id,
+            startTime: currentRound.startTime,
+            endTime: currentRound.endTime,
+            totalPool: currentRound.totalPool,
+            bets: currentRound.bets,
+            status: currentRound.status,
+          } : null,
         },
         timestamp: Date.now(),
       });
@@ -160,6 +167,7 @@ export class WebSocketService {
         playerId: player.id, 
         username: player.username,
         balance: player.balance,
+        avatar: player.avatar || null,
       },
       timestamp: Date.now(),
     });
@@ -263,6 +271,7 @@ export class WebSocketService {
           id: p.id,
           username: p.username,
           balance: p.balance,
+          avatar: p.avatar || null,
         })),
         playerId: ws.playerId,
       },

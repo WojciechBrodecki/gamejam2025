@@ -1,17 +1,33 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
 import { gameService } from '../services';
 import { config } from '../config';
 
 const router = Router();
 
+// Configure multer for memory storage (max 5MB, images only)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  },
+});
+
 // Map to store nickname -> token (persists in memory, resets on server restart)
 const nicknameTokens = new Map<string, string>();
 
 // Login endpoint - creates JWT token for a nickname (returns existing token if nickname exists)
-router.get('/login/:nickname', async (req: Request, res: Response) => {
+// POST with optional avatar image (form-data: nickname, avatar)
+router.post('/login/:nickname', upload.single('avatar'), async (req: Request, res: Response) => {
   try {
     const { nickname } = req.params;
+    const avatarFile = req.file;
 
     if (!nickname || nickname.trim() === '') {
       return res.status(400).json({ success: false, message: 'Nickname is required' });
@@ -20,19 +36,37 @@ router.get('/login/:nickname', async (req: Request, res: Response) => {
     const trimmedNickname = nickname.trim();
     const nicknameLower = trimmedNickname.toLowerCase();
 
+    // Convert avatar to base64 if provided
+    let avatarBase64: string | undefined;
+    if (avatarFile) {
+      avatarBase64 = `data:${avatarFile.mimetype};base64,${avatarFile.buffer.toString('base64')}`;
+    }
+
     // Check if nickname already has a token
     const existingToken = nicknameTokens.get(nicknameLower);
     if (existingToken) {
+      // Update avatar if provided
+      if (avatarBase64) {
+        await gameService.updatePlayerAvatar(trimmedNickname, avatarBase64);
+      }
+      
+      const player = await gameService.getPlayerByUsername(trimmedNickname);
       return res.json({
         success: true,
         token: existingToken,
         nickname: trimmedNickname,
+        avatar: player?.avatar || null,
       });
     }
 
     // Check if player with this username already exists in database - generate new token for them
     const existingPlayer = await gameService.getPlayerByUsername(trimmedNickname);
     if (existingPlayer) {
+      // Update avatar if provided
+      if (avatarBase64) {
+        await gameService.updatePlayerAvatar(trimmedNickname, avatarBase64);
+      }
+      
       const token = jwt.sign(
         { nickname: existingPlayer.username },
         config.jwtSecret,
@@ -44,6 +78,7 @@ router.get('/login/:nickname', async (req: Request, res: Response) => {
         success: true,
         token,
         nickname: existingPlayer.username,
+        avatar: avatarBase64 || existingPlayer.avatar || null,
       });
     }
 
@@ -61,6 +96,7 @@ router.get('/login/:nickname', async (req: Request, res: Response) => {
       success: true,
       token,
       nickname: trimmedNickname,
+      avatar: avatarBase64 || null,
     });
   } catch (error) {
     console.error('Login error:', error);

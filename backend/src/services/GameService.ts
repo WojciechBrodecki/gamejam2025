@@ -300,11 +300,12 @@ export class GameService {
     };
   }
 
-  async createPlayer(username: string): Promise<IPlayer> {
+  async createPlayer(username: string, avatar?: string): Promise<IPlayer> {
     const player = new Player({
       id: uuidv4(),
       username,
       balance: 1000, // Starting balance
+      avatar: avatar || null,
     });
     await player.save();
     return player;
@@ -316,6 +317,14 @@ export class GameService {
 
   async getPlayerByUsername(username: string): Promise<IPlayer | null> {
     return Player.findOne({ username });
+  }
+
+  async updatePlayerAvatar(username: string, avatar: string): Promise<IPlayer | null> {
+    return Player.findOneAndUpdate(
+      { username },
+      { avatar },
+      { new: true }
+    );
   }
 
   async getAllPlayers(): Promise<IPlayer[]> {
