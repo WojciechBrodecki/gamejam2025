@@ -2,6 +2,7 @@ export interface Player {
   id: string;
   username: string;
   balance: number;
+  avatar?: string | null;
 }
 
 export interface Bet {

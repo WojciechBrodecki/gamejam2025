@@ -74,12 +74,12 @@ export const WheelSvg = styled.svg<{ $spinning: boolean; $spinDuration?: number;
     inset 0 0 30px rgba(0,0,0,0.5);
   
   ${({ $spinning }) => $spinning && css`
-    animation: ${spin} 0.15s linear infinite;
+    animation: ${spin} 0.1s linear infinite;
   `}
   
-  /* Ease-out transition for smooth slowdown */
-  transition: ${({ $spinning }) => $spinning ? 'none' : 'transform 5s cubic-bezier(0.15, 0.85, 0.25, 1)'};
-  transform: ${({ $targetRotation }) => $targetRotation ? `rotate(${$targetRotation}deg)` : 'rotate(0deg)'};
+  /* Ease-out transition for smooth slowdown - 10 seconds with very strong deceleration */
+  transition: ${({ $spinning }) => $spinning ? 'none' : 'transform 10s cubic-bezier(0.0, 0.5, 0.1, 1.0)'};
+  transform: ${({ $targetRotation }) => $targetRotation !== undefined ? `rotate(${$targetRotation}deg)` : 'rotate(0deg)'};
 `;
 
 export const TimerCenter = styled.div`
@@ -179,6 +179,13 @@ export const WinnerIcon = styled.div<{ $color?: string }>`
   justify-content: center;
   font-size: 1.8rem;
   box-shadow: 0 0 20px ${({ $color }) => $color || '#f0c020'}80;
+  overflow: hidden;
+`;
+
+export const WinnerAvatar = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 `;
 
 export const WinnerTitle = styled.div<{ $isYou?: boolean }>`

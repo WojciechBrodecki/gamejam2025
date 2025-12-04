@@ -16,6 +16,9 @@ import {
   AppWrapper,
   MainContent,
   ConnectionDot,
+  FullScreenLoader,
+  Spinner,
+  LoaderText,
 } from './styles/App.styles';
 
 const defaultRooms: Room[] = [
@@ -26,9 +29,10 @@ const defaultRooms: Room[] = [
 ];
 
 const App: React.FC = () => {
-  const { isConnected, lastMessage, sendMessage, login, disconnect } = useWebSocket();
+  const { isConnected, lastMessage, sendMessage, login, disconnect, tryAutoLogin } = useWebSocket();
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAutoLogging, setIsAutoLogging] = useState(true);
   const [player, setPlayer] = useState<Player | null>(null);
   const [currentGame, setCurrentGame] = useState<'grand-wager' | 'timber-fever'>('grand-wager');
   const [selectedRoom, setSelectedRoom] = useState('open-1');
@@ -44,18 +48,23 @@ const App: React.FC = () => {
   
   const [betAmount, setBetAmount] = useState<string>('10');
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
-  const [winner, setWinner] = useState<{ playerId: string; username: string; amount: number } | null>(null);
+  const [winner, setWinner] = useState<{ playerId: string; username: string; amount: number; winningNumber: number; avatar?: string | null } | null>(null);
   const [roundStatus, setRoundStatus] = useState<'waiting' | 'active' | 'finished'>('waiting');
+
+  // Try auto-login on mount
+  useEffect(() => {
+    const savedSession = tryAutoLogin();
+    if (savedSession) {
+      setIsLoggedIn(true);
+    }
+    setIsAutoLogging(false);
+  }, [tryAutoLogin]);
 
   useEffect(() => {
     if (!lastMessage) return;
 
     switch (lastMessage.type) {
       case 'CONNECTED':
-        // Set round status from CONNECTED message
-        if (lastMessage.payload.roundStatus) {
-          setRoundStatus(lastMessage.payload.roundStatus);
-        }
         // Store playerId from CONNECTED (username matches our login)
         if (lastMessage.payload.username) {
           setGameState(prev => ({
@@ -74,6 +83,10 @@ const App: React.FC = () => {
         break;
 
       case 'SYNC_STATE':
+        // Pobierz roundStatus z SYNC_STATE
+        const syncRoundStatus = lastMessage.payload.currentRound?.status || 'waiting';
+        setRoundStatus(syncRoundStatus);
+        
         setGameState({
           currentRound: lastMessage.payload.currentRound,
           config: lastMessage.payload.config,
@@ -131,6 +144,8 @@ const App: React.FC = () => {
           playerId: lastMessage.payload.winner.playerId,
           username: lastMessage.payload.winner.username,
           amount: lastMessage.payload.winner.amountWon,
+          winningNumber: lastMessage.payload.winningNumber,
+          avatar: lastMessage.payload.winner.avatar,
         });
         break;
 
@@ -176,10 +191,10 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [gameState.currentRound]);
 
-  const handleLogin = async (username: string) => {
-    console.log('handleLogin called with username:', username);
+  const handleLogin = async (username: string, avatar?: File) => {
+    console.log('handleLogin called with username:', username, 'avatar:', avatar ? 'yes' : 'no');
     
-    const result = await login(username);
+    const result = await login(username, avatar);
     
     if (!result.success) {
       toast.error(result.error || 'Nie udało się zalogować');
@@ -232,15 +247,39 @@ const App: React.FC = () => {
     }
   };
 
+  // Show loading while checking for saved session
+  if (isAutoLogging) {
+    return (
+      <AppWrapper>
+        <FullScreenLoader>
+          <Spinner />
+          <LoaderText>Ładowanie...</LoaderText>
+        </FullScreenLoader>
+      </AppWrapper>
+    );
+  }
+
   if (!isLoggedIn) {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
+  // Check if we have all required data (player info and round/pool info)
+  const isDataLoaded = player && player.balance !== undefined && gameState.currentRound !== null;
+
   return (
     <AppWrapper>
+      {/* Full screen loader while waiting for player and round data */}
+      {!isDataLoaded && (
+        <FullScreenLoader>
+          <Spinner />
+          <LoaderText>Ładowanie danych gry...</LoaderText>
+        </FullScreenLoader>
+      )}
+      
       <Navbar
         balance={player?.balance || 1000}
         username={player?.username || 'Gracz'}
+        playerId={player?.id || gameState.playerId}
         onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         onLogout={handleLogout}
       />
@@ -268,14 +307,15 @@ const App: React.FC = () => {
             winner={winner}
             roundStatus={roundStatus}
             onWinnerShown={() => {
-              setTimeout(() => {
-                setWinner(null);
-                sendMessage({
-                  type: 'SYNC_STATE',
-                  payload: {},
-                  timestamp: Date.now(),
-                });
-              }, 3000);
+              // Resetuj winner i roundStatus po pokazaniu
+              setWinner(null);
+              setRoundStatus('waiting');
+              // Sync state żeby dostać nową rundę
+              sendMessage({
+                type: 'SYNC_STATE',
+                payload: {},
+                timestamp: Date.now(),
+              });
             }}
           />
         ) : (

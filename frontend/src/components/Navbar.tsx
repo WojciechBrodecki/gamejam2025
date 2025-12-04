@@ -9,10 +9,12 @@ import {
   BalanceIcon,
   UserButton,
   UserAvatar,
+  AvatarImage,
   DropdownOverlay,
   UserDropdown,
   DropdownHeader,
   DropdownAvatar,
+  DropdownAvatarImage,
   DropdownUsername,
   DropdownDivider,
   DropdownItem,
@@ -21,6 +23,7 @@ import {
 interface NavbarProps {
   balance: number;
   username: string;
+  playerId: string | null;
   onMenuToggle: () => void;
   onLogout: () => void;
 }
@@ -28,10 +31,13 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({
   balance,
   username,
+  playerId,
   onMenuToggle,
   onLogout,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
+
+  const avatarUrl = playerId ? `http://localhost:5001/api/players/${playerId}/avatar` : null;
 
   return (
     <NavbarWrapper>
@@ -51,7 +57,17 @@ const Navbar: React.FC<NavbarProps> = ({
         
         <UserButton onClick={() => setShowUserMenu(!showUserMenu)}>
           <UserAvatar>
-            {username.charAt(0).toUpperCase()}
+            {avatarUrl ? (
+              <AvatarImage 
+                src={avatarUrl} 
+                alt={username}
+                onError={(e) => {
+                  // If avatar fails to load, hide the img and show fallback
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            ) : null}
+            {!avatarUrl && username.charAt(0).toUpperCase()}
           </UserAvatar>
         </UserButton>
 
@@ -61,7 +77,16 @@ const Navbar: React.FC<NavbarProps> = ({
             <UserDropdown>
               <DropdownHeader>
                 <DropdownAvatar>
-                  {username.charAt(0).toUpperCase()}
+                  {avatarUrl ? (
+                    <DropdownAvatarImage 
+                      src={avatarUrl} 
+                      alt={username}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : null}
+                  {!avatarUrl && username.charAt(0).toUpperCase()}
                 </DropdownAvatar>
                 <DropdownUsername>{username}</DropdownUsername>
               </DropdownHeader>
