@@ -24,6 +24,8 @@ export class WebSocketService {
   private clients: Set<ExtendedWebSocket> = new Set();
   // Map of roomId -> Set of WebSocket clients in that room
   private roomClients: Map<string, Set<ExtendedWebSocket>> = new Map();
+  // Map of playerId -> Set of WebSocket clients for that player (can have multiple connections)
+  private playerClients: Map<string, Set<ExtendedWebSocket>> = new Map();
 
   constructor(server: Server) {
     // Use noServer mode for manual upgrade handling
@@ -149,9 +151,19 @@ export class WebSocketService {
           this.roomClients.delete(ws.roomId);
         }
       }
-      // Optionally leave the room in database (or keep them for reconnect)
-      // We'll leave them in the room to allow reconnects
     }
+
+    // Remove from player clients map
+    if (ws.playerId) {
+      const playerSockets = this.playerClients.get(ws.playerId);
+      if (playerSockets) {
+        playerSockets.delete(ws);
+        if (playerSockets.size === 0) {
+          this.playerClients.delete(ws.playerId);
+        }
+      }
+    }
+
     this.clients.delete(ws);
   }
 
@@ -164,6 +176,12 @@ export class WebSocketService {
 
     ws.playerId = player.id;
     ws.playerUsername = player.username;
+
+    // Track this connection for the player
+    if (!this.playerClients.has(player.id)) {
+      this.playerClients.set(player.id, new Set());
+    }
+    this.playerClients.get(player.id)!.add(ws);
   }
 
   private async handleMessage(ws: ExtendedWebSocket, message: any): Promise<void> {
@@ -182,6 +200,9 @@ export class WebSocketService {
         break;
       case 'CREATE_ROOM':
         await this.handleCreateRoom(ws, message.payload);
+        break;
+      case 'CLOSE_ROOM':
+        await this.handleCloseRoom(ws, message.payload);
         break;
       case 'PLACE_BET':
         await this.handlePlaceBet(ws, message.payload);
@@ -216,8 +237,25 @@ export class WebSocketService {
       }
     }
 
+    // Remove old player tracking if exists
+    if (ws.playerId && ws.playerId !== player.id) {
+      const oldPlayerSockets = this.playerClients.get(ws.playerId);
+      if (oldPlayerSockets) {
+        oldPlayerSockets.delete(ws);
+        if (oldPlayerSockets.size === 0) {
+          this.playerClients.delete(ws.playerId);
+        }
+      }
+    }
+
     ws.playerId = player.id;
     ws.playerUsername = player.username;
+
+    // Track this connection for the player
+    if (!this.playerClients.has(player.id)) {
+      this.playerClients.set(player.id, new Set());
+    }
+    this.playerClients.get(player.id)!.add(ws);
 
     // Send current state to the joining player
     await this.handleSyncState(ws);
@@ -228,7 +266,6 @@ export class WebSocketService {
     maxPlayers: number;
     minBet: number;
     maxBet: number;
-    type: 'public' | 'private';
   }): Promise<void> {
     if (!ws.playerId) {
       this.sendToClient(ws, {
@@ -240,12 +277,13 @@ export class WebSocketService {
     }
 
     try {
+      // Players can only create private rooms
       const room = await roomService.createRoom({
         name: payload.name,
         maxPlayers: payload.maxPlayers,
         minBet: payload.minBet,
         maxBet: payload.maxBet,
-        type: payload.type,
+        type: 'private', // Always private for player-created rooms
         creatorId: ws.playerId,
       });
 
@@ -275,14 +313,7 @@ export class WebSocketService {
         timestamp: Date.now(),
       });
 
-      // Broadcast new room to all connected clients
-      this.broadcast({
-        type: 'ROOM_LIST_UPDATE',
-        payload: {
-          rooms: (await roomService.getPublicRooms()).map(r => roomService.formatRoom(r)),
-        },
-        timestamp: Date.now(),
-      });
+      // Private rooms are not broadcast to room list
     } catch (error) {
       console.error('Create room error:', error);
       this.sendToClient(ws, {
@@ -291,6 +322,37 @@ export class WebSocketService {
         timestamp: Date.now(),
       });
     }
+  }
+
+  private async handleCloseRoom(ws: ExtendedWebSocket, payload: { roomId: string }): Promise<void> {
+    if (!ws.playerId) {
+      this.sendToClient(ws, {
+        type: 'ERROR',
+        payload: { message: 'You must join the game first', code: 'NOT_JOINED' },
+        timestamp: Date.now(),
+      });
+      return;
+    }
+
+    const result = await roomService.closeRoom(payload.roomId, ws.playerId);
+
+    if (!result.success) {
+      this.sendToClient(ws, {
+        type: 'ERROR',
+        payload: { message: result.message, code: 'CLOSE_ROOM_FAILED' },
+        timestamp: Date.now(),
+      });
+      return;
+    }
+
+    // Clear room from WebSocket tracking
+    this.roomClients.delete(payload.roomId);
+
+    this.sendToClient(ws, {
+      type: 'ROOM_CLOSED',
+      payload: { roomId: payload.roomId, message: 'Room closed successfully' },
+      timestamp: Date.now(),
+    });
   }
 
   private async handleJoinRoom(ws: ExtendedWebSocket, payload: { roomId: string }): Promise<void> {
@@ -303,9 +365,15 @@ export class WebSocketService {
       return;
     }
 
-    // Leave current room if in one
+    // Leave current room's WS channel if in one (but don't leave the DB room)
     if (ws.roomId) {
-      await this.handleLeaveRoom(ws, true);
+      const roomClients = this.roomClients.get(ws.roomId);
+      if (roomClients) {
+        roomClients.delete(ws);
+        if (roomClients.size === 0) {
+          this.roomClients.delete(ws.roomId);
+        }
+      }
     }
 
     const result = await roomService.joinRoom(payload.roomId, ws.playerId);
@@ -358,9 +426,15 @@ export class WebSocketService {
       return;
     }
 
-    // Leave current room if in one
+    // Leave current room's WS channel if in one
     if (ws.roomId) {
-      await this.handleLeaveRoom(ws, true);
+      const roomClients = this.roomClients.get(ws.roomId);
+      if (roomClients) {
+        roomClients.delete(ws);
+        if (roomClients.size === 0) {
+          this.roomClients.delete(ws.roomId);
+        }
+      }
     }
 
     const result = await roomService.joinRoomByInviteCode(payload.inviteCode, ws.playerId);
@@ -535,6 +609,20 @@ export class WebSocketService {
     if (!roomClients) return;
 
     roomClients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(data);
+      }
+    });
+  }
+
+  // Send message to all connections of a specific player (by playerId)
+  sendToPlayer(playerId: string, message: any): void {
+    const data = JSON.stringify(message);
+    const playerSockets = this.playerClients.get(playerId);
+    
+    if (!playerSockets) return;
+
+    playerSockets.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(data);
       }

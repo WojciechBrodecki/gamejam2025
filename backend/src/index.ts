@@ -22,13 +22,29 @@ app.get('/', (req, res) => {
 
 app.use('/api', apiRoutes);
 
+// Default public rooms configuration
+const DEFAULT_ROOMS = [
+  {
+    name: 'Low Stake',
+    minBet: 1,
+    maxBet: 100,
+    maxPlayers: 20,
+  },
+  {
+    name: 'High Stake',
+    minBet: 100,
+    maxBet: 1000,
+    maxPlayers: 20,
+  },
+];
+
 // Connect to MongoDB and start server
 async function start(): Promise<void> {
   try {
     await mongoose.connect(config.mongodbUri);
     console.log('Connected to MongoDB');
 
-    server.listen(PORT, () => {
+    server.listen(PORT, async () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`WebSocket available at ws://localhost:${PORT}/ws`);
       
@@ -37,8 +53,11 @@ async function start(): Promise<void> {
       gameService.setWebSocketService(wsService);
       roomService.setWebSocketService(wsService);
       
+      // Create default public rooms if they don't exist
+      await roomService.ensureDefaultRooms(DEFAULT_ROOMS);
+      
       console.log('Room-based game system initialized');
-      console.log('Players can create/join rooms to play separate rounds');
+      console.log('Default public rooms created');
     });
   } catch (error) {
     console.error('Failed to start server:', error);

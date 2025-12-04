@@ -38,6 +38,7 @@ export interface Room {
   maxBet: number;
   type: RoomType;
   inviteCode?: string;
+  creatorId: string;
   playerCount: number;
   status: RoomStatus;
   createdAt: Date;
@@ -68,6 +69,7 @@ export type WSMessageType =
   | 'BET_PLACED'
   | 'ROUND_END'
   | 'ROUND_START'
+  | 'ROUND_RESULT_NOTIFICATION'
   | 'PLAYER_JOINED'
   | 'PLAYER_LEFT'
   | 'PLAYER_JOINED_ROOM'
@@ -79,6 +81,7 @@ export type WSMessageType =
   | 'JOIN_ROOM_BY_CODE'
   | 'LEAVE_ROOM'
   | 'CREATE_ROOM'
+  | 'CLOSE_ROOM'
   | 'ROOM_CREATED'
   | 'ROOM_JOINED'
   | 'ROOM_LEFT'
@@ -208,4 +211,23 @@ export interface ConnectedPayload {
 export interface ErrorPayload {
   message: string;
   code: string;
+}
+
+// Personal notification sent to players who placed bets when a round ends
+export interface RoundResultNotificationPayload {
+  roomId: string;
+  roomName: string;
+  roundId: string;
+  isWinner: boolean;
+  totalBet: number;
+  amountWon: number;
+  amountLost: number;
+  netResult: number; // positive for win, negative for loss
+  winnerUsername: string;
+  totalPool: number;
+  currentBalance: number;
+}
+
+export interface CloseRoomPayload {
+  roomId: string;
 }

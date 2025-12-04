@@ -146,15 +146,15 @@ router.get('/rooms/:roomId', async (req: Request, res: Response) => {
   }
 });
 
-// Create a new room
+// Create a new private room (players can only create private rooms)
 router.post('/rooms', async (req: Request, res: Response) => {
   try {
-    const { name, maxPlayers, minBet, maxBet, type, creatorId } = req.body;
+    const { name, maxPlayers, minBet, maxBet, creatorId } = req.body;
 
-    if (!name || !maxPlayers || !minBet || !maxBet || !type || !creatorId) {
+    if (!name || !maxPlayers || !minBet || !maxBet || !creatorId) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Missing required fields: name, maxPlayers, minBet, maxBet, type, creatorId' 
+        message: 'Missing required fields: name, maxPlayers, minBet, maxBet, creatorId' 
       });
     }
 
@@ -172,19 +172,13 @@ router.post('/rooms', async (req: Request, res: Response) => {
       });
     }
 
-    if (!['public', 'private'].includes(type)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'type must be either "public" or "private"' 
-      });
-    }
-
+    // Players can only create private rooms
     const room = await roomService.createRoom({
       name,
       maxPlayers,
       minBet,
       maxBet,
-      type,
+      type: 'private',
       creatorId,
     });
 

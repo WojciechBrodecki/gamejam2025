@@ -12,6 +12,13 @@ export interface CreateRoomOptions {
   creatorId: string;
 }
 
+export interface DefaultRoomConfig {
+  name: string;
+  minBet: number;
+  maxBet: number;
+  maxPlayers: number;
+}
+
 export interface RoomRoundState {
   currentRound: IRound | null;
   roundTimer: NodeJS.Timeout | null;
@@ -22,6 +29,8 @@ export class RoomService {
   private wsService: WebSocketService | null = null;
   // In-memory state for each room's round (roomId -> state)
   private roomStates: Map<string, RoomRoundState> = new Map();
+  // IDs of default public rooms (cannot be closed)
+  private defaultRoomIds: Set<string> = new Set();
 
   setWebSocketService(wsService: WebSocketService): void {
     this.wsService = wsService;
@@ -31,7 +40,62 @@ export class RoomService {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
   }
 
+  // Create default public rooms on server startup
+  async ensureDefaultRooms(defaultRooms: DefaultRoomConfig[]): Promise<void> {
+    for (const roomConfig of defaultRooms) {
+      // Check if room with this name already exists
+      let room = await Room.findOne({ name: roomConfig.name, type: 'public' });
+      
+      if (!room) {
+        // Create new default public room
+        const roomId = uuidv4();
+        room = new Room({
+          id: roomId,
+          name: roomConfig.name,
+          maxPlayers: roomConfig.maxPlayers,
+          minBet: roomConfig.minBet,
+          maxBet: roomConfig.maxBet,
+          type: 'public',
+          creatorId: 'SYSTEM', // System-created room
+          playerIds: [],
+          status: 'waiting',
+        });
+        await room.save();
+        console.log(`Created default public room: ${roomConfig.name}`);
+      } else {
+        // Ensure room is not closed
+        if (room.status === 'closed') {
+          room.status = 'waiting';
+          await room.save();
+        }
+        console.log(`Default public room already exists: ${roomConfig.name}`);
+      }
+
+      // Track as default room
+      this.defaultRoomIds.add(room.id);
+
+      // Initialize room state
+      if (!this.roomStates.has(room.id)) {
+        this.roomStates.set(room.id, {
+          currentRound: null,
+          roundTimer: null,
+          updateInterval: null,
+        });
+      }
+
+      // Create waiting round if not exists
+      if (!this.getCurrentRound(room.id)) {
+        await this.createWaitingRound(room.id);
+      }
+    }
+  }
+
   async createRoom(options: CreateRoomOptions): Promise<IRoom> {
+    // Players can only create private rooms
+    if (options.type !== 'private') {
+      throw new Error('Players can only create private rooms');
+    }
+
     const roomId = uuidv4();
     
     const room = new Room({
@@ -40,8 +104,8 @@ export class RoomService {
       maxPlayers: options.maxPlayers,
       minBet: options.minBet,
       maxBet: options.maxBet,
-      type: options.type,
-      inviteCode: options.type === 'private' ? this.generateInviteCode() : undefined,
+      type: 'private',
+      inviteCode: this.generateInviteCode(),
       creatorId: options.creatorId,
       playerIds: [options.creatorId], // Creator auto-joins
       status: 'waiting',
@@ -59,7 +123,7 @@ export class RoomService {
     // Create initial waiting round for this room
     await this.createWaitingRound(roomId);
 
-    console.log(`Room created: ${room.name} (${room.id}) by ${options.creatorId}`);
+    console.log(`Private room created: ${room.name} (${room.id}) by ${options.creatorId}`);
     return room;
   }
 
@@ -144,8 +208,8 @@ export class RoomService {
 
     room.playerIds.splice(playerIndex, 1);
 
-    // If room is empty, close it
-    if (room.playerIds.length === 0) {
+    // Only close private rooms when empty (public rooms stay open)
+    if (room.playerIds.length === 0 && room.type === 'private') {
       room.status = 'closed';
       this.cleanupRoomState(roomId);
     }
@@ -176,6 +240,16 @@ export class RoomService {
       return { success: false, message: 'Room not found' };
     }
 
+    // Cannot close default public rooms
+    if (this.defaultRoomIds.has(roomId)) {
+      return { success: false, message: 'Cannot close default public rooms' };
+    }
+
+    // Cannot close public rooms (only private)
+    if (room.type === 'public') {
+      return { success: false, message: 'Cannot close public rooms' };
+    }
+
     if (room.creatorId !== requesterId) {
       return { success: false, message: 'Only room creator can close the room' };
     }
@@ -194,6 +268,10 @@ export class RoomService {
 
     console.log(`Room ${room.name} closed by ${requesterId}`);
     return { success: true, message: 'Room closed' };
+  }
+
+  isDefaultRoom(roomId: string): boolean {
+    return this.defaultRoomIds.has(roomId);
   }
 
   private cleanupRoomState(roomId: string): void {
@@ -474,11 +552,19 @@ export class RoomService {
         await winnerPlayer.save();
       }
 
-      // Broadcast round end to room
+      // Calculate each player's total bet and loss/win
+      const playerTotalBets = new Map<string, number>();
+      for (const bet of state.currentRound.bets) {
+        const current = playerTotalBets.get(bet.playerId) || 0;
+        playerTotalBets.set(bet.playerId, current + bet.amount);
+      }
+
+      // Broadcast round end to room (for clients currently viewing the room)
       this.wsService?.broadcastToRoom(roomId, {
         type: 'ROUND_END',
         payload: {
           roomId,
+          roomName: room.name,
           round: this.formatRound(state.currentRound),
           winner: {
             playerId: winner.playerId,
@@ -489,6 +575,35 @@ export class RoomService {
         },
         timestamp: Date.now(),
       });
+
+      // Send personal notifications to all players who placed bets
+      const uniqueBetterIds = [...playerTotalBets.keys()];
+      for (const betterId of uniqueBetterIds) {
+        const totalBet = playerTotalBets.get(betterId) || 0;
+        const isWinner = betterId === winner.playerId;
+        
+        // Get updated balance
+        const betterPlayer = await Player.findOne({ id: betterId });
+        const currentBalance = betterPlayer?.balance || 0;
+
+        this.wsService?.sendToPlayer(betterId, {
+          type: 'ROUND_RESULT_NOTIFICATION',
+          payload: {
+            roomId,
+            roomName: room.name,
+            roundId: state.currentRound.id,
+            isWinner,
+            totalBet,
+            amountWon: isWinner ? winnerAmount : 0,
+            amountLost: isWinner ? 0 : totalBet,
+            netResult: isWinner ? (winnerAmount - totalBet) : -totalBet,
+            winnerUsername: winner.playerUsername,
+            totalPool: state.currentRound.totalPool,
+            currentBalance,
+          },
+          timestamp: Date.now(),
+        });
+      }
 
       console.log(`\n🎉 ========== WINNER (Room: ${room.name}) ==========`);
       console.log(`🏆 Player: ${winner.playerUsername}`);
@@ -571,6 +686,7 @@ export class RoomService {
       maxBet: room.maxBet,
       type: room.type,
       inviteCode: room.inviteCode,
+      creatorId: room.creatorId,
       playerCount: room.playerIds.length,
       status: room.status,
       createdAt: room.createdAt,
@@ -579,4 +695,3 @@ export class RoomService {
 }
 
 export const roomService = new RoomService();
-
