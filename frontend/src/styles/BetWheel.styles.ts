@@ -64,7 +64,7 @@ export const WheelPointer = styled.div`
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
 `;
 
-export const WheelSvg = styled.svg<{ $spinning: boolean; $spinDuration?: number; $targetRotation?: number }>`
+export const WheelSvg = styled.svg<{ $spinning?: boolean }>`
   width: 100%;
   height: 100%;
   border-radius: 50%;
@@ -72,14 +72,6 @@ export const WheelSvg = styled.svg<{ $spinning: boolean; $spinDuration?: number;
     0 0 0 4px ${({ theme }) => theme.colors.gold},
     0 0 20px rgba(240, 192, 32, 0.3),
     inset 0 0 30px rgba(0,0,0,0.5);
-  
-  ${({ $spinning }) => $spinning && css`
-    animation: ${spin} 0.1s linear infinite;
-  `}
-  
-  /* Ease-out transition for smooth slowdown - 10 seconds with very strong deceleration */
-  transition: ${({ $spinning }) => $spinning ? 'none' : 'transform 10s cubic-bezier(0.0, 0.5, 0.1, 1.0)'};
-  transform: ${({ $targetRotation }) => $targetRotation !== undefined ? `rotate(${$targetRotation}deg)` : 'rotate(0deg)'};
 `;
 
 export const TimerCenter = styled.div`

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_BASE_URL } from '../config';
 import {
   NavbarWrapper,
   MenuButton,
@@ -37,7 +38,7 @@ const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  const avatarUrl = playerId ? `http://localhost:5001/api/players/${playerId}/avatar` : null;
+  const avatarUrl = playerId ? `${API_BASE_URL}/api/players/${playerId}/avatar` : null;
 
   return (
     <NavbarWrapper>

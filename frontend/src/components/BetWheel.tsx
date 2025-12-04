@@ -1,4 +1,5 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../config';
 import {
   WheelContainer,
   WheelWrapper,
@@ -75,17 +76,28 @@ const BetWheel: React.FC<BetWheelProps> = ({
   winner,
   onWinnerShown,
 }) => {
+  // Stan animacji
+  const [rotation, setRotation] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
-  const [targetRotation, setTargetRotation] = useState(0);
-  const [showWinner, setShowWinner] = useState(false);
-  const [winnerInfo, setWinnerInfo] = useState<{ chance: number; color: string } | null>(null);
-  const [spinPhase, setSpinPhase] = useState<'idle' | 'fast' | 'slowdown' | 'done'>('idle');
+  const [showWinnerPopup, setShowWinnerPopup] = useState(false);
+  
+  // Zapamiętane dane do wyświetlenia podczas animacji
+  const [displayBets, setDisplayBets] = useState<Bet[]>([]);
+  const [displayPool, setDisplayPool] = useState(0);
+  const [winnerData, setWinnerData] = useState<{chance: number; color: string} | null>(null);
+  
+  // Ref do śledzenia czy już obsłużyliśmy tego winnera
+  const lastWinnerIdRef = useRef<string | null>(null);
+  const animationRef = useRef<number | null>(null);
 
-  // Agreguj zakłady per gracz
+  // Agreguj zakłady per gracz - używaj displayBets podczas animacji
+  const activeBets = isSpinning || showWinnerPopup ? displayBets : bets;
+  const activePool = isSpinning || showWinnerPopup ? displayPool : totalPool;
+
   const aggregatedBets = useMemo(() => {
     const byPlayer: Record<string, AggregatedBet> = {};
     
-    bets.forEach((bet, index) => {
+    activeBets.forEach((bet) => {
       if (!byPlayer[bet.playerId]) {
         const colorIndex = Object.keys(byPlayer).length % PLAYER_COLORS.length;
         byPlayer[bet.playerId] = {
@@ -99,120 +111,149 @@ const BetWheel: React.FC<BetWheelProps> = ({
       byPlayer[bet.playerId].totalAmount += bet.amount;
     });
 
-    // Oblicz procenty
     Object.values(byPlayer).forEach(player => {
-      player.percent = totalPool > 0 ? (player.totalAmount / totalPool) * 100 : 0;
+      player.percent = activePool > 0 ? (player.totalAmount / activePool) * 100 : 0;
     });
 
     return Object.values(byPlayer).sort((a, b) => b.totalAmount - a.totalAmount);
-  }, [bets, totalPool]);
+  }, [activeBets, activePool]);
 
-  // Efekt animacji kręcenia koła gdy jest winner
+  // Główna logika animacji - reaguj na nowego winnera
   useEffect(() => {
-    if (winner && aggregatedBets.length > 0 && totalPool > 0) {
-      // Znajdź info o zwycięzcy dla popup
-      const winnerPlayer = aggregatedBets.find(p => p.playerId === winner.playerId);
+    if (!winner) {
+      // Reset gdy winner zniknie
+      lastWinnerIdRef.current = null;
+      return;
+    }
 
-      // Zapisz info o zwycięzcy
-      if (winnerPlayer) {
-        setWinnerInfo({
-          chance: winnerPlayer.percent,
-          color: winnerPlayer.color,
-        });
+    // Unikalna identyfikacja winnera
+    const winnerId = `${winner.playerId}-${winner.winningNumber}`;
+    
+    // Jeśli już obsłużyliśmy tego winnera, nic nie rób
+    if (lastWinnerIdRef.current === winnerId) {
+      return;
+    }
+    
+    // Sprawdź czy mamy dane do animacji
+    if (bets.length === 0 || totalPool === 0) {
+      console.log('No bets data for animation');
+      return;
+    }
+
+    console.log('🎰 Starting wheel animation for:', winner.username);
+    lastWinnerIdRef.current = winnerId;
+
+    // Zamroź dane
+    setDisplayBets([...bets]);
+    setDisplayPool(totalPool);
+
+    // Oblicz dane o zwycięzcy
+    const byPlayer: Record<string, AggregatedBet> = {};
+    bets.forEach((bet) => {
+      if (!byPlayer[bet.playerId]) {
+        const colorIndex = Object.keys(byPlayer).length % PLAYER_COLORS.length;
+        byPlayer[bet.playerId] = {
+          playerId: bet.playerId,
+          username: bet.playerUsername,
+          totalAmount: 0,
+          percent: 0,
+          color: PLAYER_COLORS[colorIndex],
+        };
       }
-
-      // NOWE PODEJŚCIE: Backend wysyła winningNumber
-      // Wzór: rotationDegrees = (winningNumber / totalPool) * 360
-      const winningAngle = (winner.winningNumber / totalPool) * 360;
-      
-      // Dodajemy pełne obroty dla efektu wizualnego (8 pełnych obrotów)
-      const spins = 8;
-      const finalRotation = spins * 360 + (360 - winningAngle);
-
-      console.log('Winner calculation:', {
-        winningNumber: winner.winningNumber,
-        totalPool,
-        winningAngle,
-        finalRotation,
-        winner: winner.username,
+      byPlayer[bet.playerId].totalAmount += bet.amount;
+    });
+    Object.values(byPlayer).forEach(player => {
+      player.percent = totalPool > 0 ? (player.totalAmount / totalPool) * 100 : 0;
+    });
+    
+    const winnerPlayer = byPlayer[winner.playerId];
+    console.log('🎯 Winner player data:', winnerPlayer, 'from byPlayer:', byPlayer, 'winner.playerId:', winner.playerId);
+    if (winnerPlayer) {
+      setWinnerData({
+        chance: winnerPlayer.percent,
+        color: winnerPlayer.color,
       });
+    } else {
+      // Fallback - jeśli nie znaleziono gracza w zakładach
+      console.log('⚠️ Winner not found in bets, using fallback');
+      setWinnerData({
+        chance: 0,
+        color: PLAYER_COLORS[0],
+      });
+    }
 
-      // Start: szybkie kręcenie przez 300ms, potem CSS transition przejmuje
-      setSpinPhase('fast');
-      setIsSpinning(true);
-      setTargetRotation(0);
+    // Oblicz docelowy kąt
+    const winningAngle = (winner.winningNumber / totalPool) * 360;
+    const spins = 5; // 5 pełnych obrotów
+    const targetRotation = spins * 360 + (360 - winningAngle);
+
+    console.log('Target rotation:', targetRotation, 'Winning angle:', winningAngle);
+
+    // Animacja kręcenia - 1 obrót na sekundę = 5 sekund na 5 obrotów
+    const duration = 3000; // 3 sekundy
+    const startTime = Date.now();
+    const startRotation = rotation;
+
+    setIsSpinning(true);
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
       
-      // Po krótkim szybkim kręceniu, przejdź do płynnego zwalniania (CSS transition)
-      const fastSpinTimeout = setTimeout(() => {
+      // Ease out - zwalnianie na końcu
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      
+      const currentRotation = startRotation + (targetRotation - startRotation) * easeOut;
+      setRotation(currentRotation);
+
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      } else {
+        // Animacja zakończona
+        console.log('🎰 Animation finished, showing winner popup');
         setIsSpinning(false);
-        setSpinPhase('slowdown');
-        setTargetRotation(finalRotation);
-      }, 300);
+        // NIE normalizuj rotation - zostaw końcową pozycję
+        
+        // Pokaż popup winnera po krótkim opóźnieniu
+        setTimeout(() => {
+          console.log('🎰 Setting showWinnerPopup to true');
+          setShowWinnerPopup(true);
+        }, 500);
+      }
+    };
 
-      // Fallback: jeśli onTransitionEnd nie zostanie wywołany, pokaż winnera po 11s
-      const fallbackTimeout = setTimeout(() => {
-        if (spinPhase !== 'done') {
-          console.log('Fallback: showing winner');
-          setSpinPhase('done');
-          setShowWinner(true);
-        }
-      }, 11000);
+    animationRef.current = requestAnimationFrame(animate);
 
-      return () => {
-        clearTimeout(fastSpinTimeout);
-        clearTimeout(fallbackTimeout);
-      };
-    } else if (!winner) {
-      setIsSpinning(false);
-      setTargetRotation(0);
-      setShowWinner(false);
-      setWinnerInfo(null);
-      setSpinPhase('idle');
-    }
-  }, [winner, aggregatedBets, totalPool]);
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [winner, bets, totalPool]);
 
-  // Handler dla zakończenia CSS transition
-  const handleTransitionEnd = (e: React.TransitionEvent) => {
-    // Tylko reaguj na transform transition
-    if (e.propertyName !== 'transform') return;
-    
-    console.log('Transition ended, spinPhase:', spinPhase);
-    
-    if (spinPhase === 'slowdown') {
-      setSpinPhase('done');
-      // Pokaż winnera po 0.5s opóźnienia
-      setTimeout(() => {
-        setShowWinner(true);
-      }, 500);
-    }
-  };
-
-  // Wywołaj onWinnerShown po pokazaniu popupu zwycięzcy (po 3 sekundach)
+  // Wywołaj callback po pokazaniu winnera
   useEffect(() => {
-    if (showWinner && winner) {
-      console.log('showWinner is true, will call onWinnerShown in 3s');
+    if (showWinnerPopup && winner) {
       const timeout = setTimeout(() => {
-        console.log('Calling onWinnerShown');
+        console.log('🏆 Winner shown, calling onWinnerShown');
+        setShowWinnerPopup(false);
+        setDisplayBets([]);
+        setDisplayPool(0);
+        setWinnerData(null);
         onWinnerShown?.();
       }, 3000);
       return () => clearTimeout(timeout);
     }
-  }, [showWinner, winner, onWinnerShown]);
+  }, [showWinnerPopup, winner, onWinnerShown]);
 
   const formatTime = (ms: number): string => {
     const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    if (minutes > 0) {
-      return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-    }
-    return `${remainingSeconds}`;
+    return `${seconds}`;
   };
 
   // Generuj segmenty SVG dla koła
   const renderWheelSegments = () => {
     if (aggregatedBets.length === 0) {
-      // Pusty wheel
       return (
         <circle
           cx="50"
@@ -226,17 +267,15 @@ const BetWheel: React.FC<BetWheelProps> = ({
     }
 
     const segments: JSX.Element[] = [];
-    let currentAngle = -90; // Start from top
+    let currentAngle = -90;
 
-    aggregatedBets.forEach((player, index) => {
+    aggregatedBets.forEach((player) => {
       const angle = (player.percent / 100) * 360;
-      
       if (angle <= 0) return;
 
       const startAngle = currentAngle;
       const endAngle = currentAngle + angle;
 
-      // Oblicz punkty łuku
       const startRad = (startAngle * Math.PI) / 180;
       const endRad = (endAngle * Math.PI) / 180;
 
@@ -274,20 +313,17 @@ const BetWheel: React.FC<BetWheelProps> = ({
         
         <WheelSvg
           viewBox="0 0 100 100"
-          $spinning={isSpinning}
-          $targetRotation={isSpinning ? undefined : targetRotation}
-          onTransitionEnd={handleTransitionEnd}
+          style={{ transform: `rotate(${rotation}deg)` }}
         >
           {renderWheelSegments()}
-          {/* Wewnętrzny okrąg na timer */}
           <circle cx="50" cy="50" r="24" fill="#0d0d14" />
         </WheelSvg>
 
         <TimerCenter>
-          {spinPhase === 'done' && winner && winnerInfo ? (
-            <WinnerIcon $color={winnerInfo.color}>
+          {showWinnerPopup && winner && winnerData ? (
+            <WinnerIcon $color={winnerData.color}>
               <WinnerAvatar 
-                src={`http://localhost:5001/api/players/${winner.playerId}/avatar`} 
+                src={`${API_BASE_URL}/api/players/${winner.playerId}/avatar`} 
                 alt={winner.username}
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
@@ -305,11 +341,13 @@ const BetWheel: React.FC<BetWheelProps> = ({
           )}
         </TimerCenter>
 
-        {showWinner && winner && (
+        {showWinnerPopup && winner && winnerData && (
+          <>
+          {console.log('🏆 Rendering WinnerOverlay:', { showWinnerPopup, winner, winnerData })}
           <WinnerOverlay>
-            <WinnerIcon $color={winnerInfo?.color}>
+            <WinnerIcon $color={winnerData.color}>
               <WinnerAvatar 
-                src={`http://localhost:5001/api/players/${winner.playerId}/avatar`} 
+                src={`${API_BASE_URL}/api/players/${winner.playerId}/avatar`} 
                 alt={winner.username}
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
@@ -323,15 +361,16 @@ const BetWheel: React.FC<BetWheelProps> = ({
             <WinnerName>{winner.username}</WinnerName>
             <WinnerAmount>+${winner.amount.toFixed(2)}</WinnerAmount>
             <WinnerChance>
-              Szansa: <span>{winnerInfo?.chance.toFixed(1)}%</span>
+              Szansa: <span>{winnerData.chance.toFixed(1)}%</span>
             </WinnerChance>
           </WinnerOverlay>
+          </>
         )}
       </WheelWrapper>
 
       <PoolInfo>
         <PoolLabel>Pula</PoolLabel>
-        <PoolValue>${totalPool.toFixed(2)}</PoolValue>
+        <PoolValue>${activePool.toFixed(2)}</PoolValue>
       </PoolInfo>
 
       {aggregatedBets.length > 0 && (

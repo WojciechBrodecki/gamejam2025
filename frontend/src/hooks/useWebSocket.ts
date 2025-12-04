@@ -1,13 +1,8 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { WSMessage } from '../types';
+import { API_BASE_URL, WS_BASE_URL } from '../config';
 
-const API_URL = process.env.NODE_ENV === 'production' 
-  ? ''
-  : 'http://localhost:5001';
-
-const WS_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? `ws://${window.location.host}/ws`
-  : 'ws://localhost:5001/ws';
+const API_URL = API_BASE_URL;
 
 const TOKEN_STORAGE_KEY = 'grand_wager_token';
 const NICKNAME_STORAGE_KEY = 'grand_wager_nickname';

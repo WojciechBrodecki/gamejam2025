@@ -20,6 +20,7 @@ import {
   Spinner,
   LoaderText,
 } from './styles/App.styles';
+import { API_BASE_URL } from './config';
 
 const defaultRooms: Room[] = [
   { id: 'open-1', name: 'Główny Pokój', type: 'open-limit', minBet: 1, maxBet: 10000, playersCount: 0 },
@@ -60,6 +61,24 @@ const App: React.FC = () => {
     setIsAutoLogging(false);
   }, [tryAutoLogin]);
 
+  // Fetch player data from API when we get playerId
+  const fetchPlayerData = async (playerId: string) => {
+    try {
+      console.log('fetchPlayerData: Fetching from', `${API_BASE_URL}/api/player/${playerId}`);
+      const response = await fetch(`${API_BASE_URL}/api/player/${playerId}`);
+      const data = await response.json();
+      console.log('fetchPlayerData: Response', data);
+      if (data.success && data.data) {
+        setPlayer(data.data);
+        console.log('fetchPlayerData: Player set', data.data);
+      } else {
+        console.error('fetchPlayerData: Invalid response', data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch player data:', error);
+    }
+  };
+
   useEffect(() => {
     if (!lastMessage) return;
 
@@ -83,28 +102,25 @@ const App: React.FC = () => {
         break;
 
       case 'SYNC_STATE':
+        console.log('SYNC_STATE received:', lastMessage.payload);
         // Pobierz roundStatus z SYNC_STATE
         const syncRoundStatus = lastMessage.payload.currentRound?.status || 'waiting';
         setRoundStatus(syncRoundStatus);
         
-        setGameState({
+        setGameState(prev => ({
+          ...prev,
           currentRound: lastMessage.payload.currentRound,
           config: lastMessage.payload.config,
-          players: lastMessage.payload.players,
           playerId: lastMessage.payload.playerId,
-        });
+        }));
+        
+        // Fetch player data from API
         if (lastMessage.payload.playerId) {
-          const currentPlayer = lastMessage.payload.players.find(
-            (p: Player) => p.id === lastMessage.payload.playerId
-          );
-          if (currentPlayer) {
-            setPlayer(currentPlayer);
-          }
+          console.log('Fetching player data for:', lastMessage.payload.playerId);
+          fetchPlayerData(lastMessage.payload.playerId);
+        } else {
+          console.warn('No playerId in SYNC_STATE!');
         }
-        setRooms(prev => prev.map(room => ({
-          ...room,
-          playersCount: lastMessage.payload.players?.length || 0,
-        })));
         break;
 
       case 'ROUND_START':
@@ -129,12 +145,9 @@ const App: React.FC = () => {
           ...prev,
           currentRound: lastMessage.payload.round,
         }));
-        if (player) {
-          sendMessage({
-            type: 'SYNC_STATE',
-            payload: {},
-            timestamp: Date.now(),
-          });
+        // Refresh player balance after bet
+        if (gameState.playerId) {
+          fetchPlayerData(gameState.playerId);
         }
         break;
 
@@ -147,24 +160,9 @@ const App: React.FC = () => {
           winningNumber: lastMessage.payload.winningNumber,
           avatar: lastMessage.payload.winner.avatar,
         });
-        break;
-
-      case 'PLAYER_JOINED':
-        // Set player data from PLAYER_JOINED - includes balance
-        // Check by username since we might not have playerId yet
-        const joinedUsername = lastMessage.payload.username;
-        if (lastMessage.payload.playerId === gameState.playerId || 
-            (player && player.username === joinedUsername) ||
-            (!player && joinedUsername)) {
-          setPlayer({
-            id: lastMessage.payload.playerId,
-            username: lastMessage.payload.username,
-            balance: lastMessage.payload.balance,
-          });
-          setGameState(prev => ({
-            ...prev,
-            playerId: lastMessage.payload.playerId,
-          }));
+        // Refresh player balance after round end (might have won)
+        if (gameState.playerId) {
+          fetchPlayerData(gameState.playerId);
         }
         break;
 
@@ -173,7 +171,7 @@ const App: React.FC = () => {
         toast.error(lastMessage.payload.message);
         break;
     }
-  }, [lastMessage, player, sendMessage, gameState.playerId]);
+  }, [lastMessage, gameState.playerId]);
 
   useEffect(() => {
     if (!gameState.currentRound || gameState.currentRound.status === 'finished') {
@@ -263,12 +261,12 @@ const App: React.FC = () => {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
-  // Check if we have all required data (player info and round/pool info)
-  const isDataLoaded = player && player.balance !== undefined && gameState.currentRound !== null;
+  // Check if we have all required data (player info - balance is the key indicator that SYNC_STATE was received)
+  const isDataLoaded = player !== null && player.balance !== undefined;
 
   return (
     <AppWrapper>
-      {/* Full screen loader while waiting for player and round data */}
+      {/* Full screen loader while waiting for player data */}
       {!isDataLoaded && (
         <FullScreenLoader>
           <Spinner />
