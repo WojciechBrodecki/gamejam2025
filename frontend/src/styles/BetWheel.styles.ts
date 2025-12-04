@@ -221,13 +221,29 @@ export const PlayerLegendItem = styled.div<{ $color: string; $isYou?: boolean }>
   border: 1px solid ${({ $isYou, theme }) => $isYou ? theme.colors.blue : theme.colors.border};
   border-radius: 20px;
   font-size: 0.8rem;
+`;
 
-  &::before {
-    content: '';
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: ${({ $color }) => $color};
+export const PlayerLegendAvatar = styled.div<{ $color: string }>`
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: ${({ $color }) => $color};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: #0d0d14;
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+  
+  img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 `;
 

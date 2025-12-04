@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../config';
 import {
   NavbarWrapper,
@@ -37,8 +37,28 @@ const Navbar: React.FC<NavbarProps> = ({
   onLogout,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [balanceAnimate, setBalanceAnimate] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
+  const [dropdownAvatarError, setDropdownAvatarError] = useState(false);
+  const prevBalanceRef = useRef(balance);
 
   const avatarUrl = playerId ? `${API_BASE_URL}/api/players/${playerId}/avatar` : null;
+
+  // Animacja przy zmianie balansu
+  useEffect(() => {
+    if (prevBalanceRef.current !== balance) {
+      setBalanceAnimate(true);
+      const timeout = setTimeout(() => setBalanceAnimate(false), 600);
+      prevBalanceRef.current = balance;
+      return () => clearTimeout(timeout);
+    }
+  }, [balance]);
+
+  // Reset avatar error when playerId changes
+  useEffect(() => {
+    setAvatarError(false);
+    setDropdownAvatarError(false);
+  }, [playerId]);
 
   return (
     <NavbarWrapper>
@@ -51,24 +71,21 @@ const Navbar: React.FC<NavbarProps> = ({
       <NavLogo>GRAND WAGER</NavLogo>
 
       <NavUser>
-        <NavBalance>
+        <NavBalance $animate={balanceAnimate}>
           <BalanceValue>{balance.toFixed(0)}</BalanceValue>
           <BalanceIcon>$</BalanceIcon>
         </NavBalance>
         
         <UserButton onClick={() => setShowUserMenu(!showUserMenu)}>
           <UserAvatar>
-            {avatarUrl ? (
+            {avatarUrl && !avatarError && (
               <AvatarImage 
                 src={avatarUrl} 
                 alt={username}
-                onError={(e) => {
-                  // If avatar fails to load, hide the img and show fallback
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
+                onError={() => setAvatarError(true)}
               />
-            ) : null}
-            {!avatarUrl && username.charAt(0).toUpperCase()}
+            )}
+            {(!avatarUrl || avatarError) && username.charAt(0).toUpperCase()}
           </UserAvatar>
         </UserButton>
 
@@ -78,16 +95,14 @@ const Navbar: React.FC<NavbarProps> = ({
             <UserDropdown>
               <DropdownHeader>
                 <DropdownAvatar>
-                  {avatarUrl ? (
+                  {avatarUrl && !dropdownAvatarError && (
                     <DropdownAvatarImage 
                       src={avatarUrl} 
                       alt={username}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
+                      onError={() => setDropdownAvatarError(true)}
                     />
-                  ) : null}
-                  {!avatarUrl && username.charAt(0).toUpperCase()}
+                  )}
+                  {(!avatarUrl || dropdownAvatarError) && username.charAt(0).toUpperCase()}
                 </DropdownAvatar>
                 <DropdownUsername>{username}</DropdownUsername>
               </DropdownHeader>

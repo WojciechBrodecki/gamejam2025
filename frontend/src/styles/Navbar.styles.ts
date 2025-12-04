@@ -11,6 +11,30 @@ const slideDown = keyframes`
   }
 `;
 
+const balancePop = keyframes`
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+`;
+
+const balanceGlow = keyframes`
+  0% {
+    box-shadow: 0 0 0 rgba(64, 192, 128, 0);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(64, 192, 128, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(64, 192, 128, 0);
+  }
+`;
+
 export const NavbarWrapper = styled.nav`
   height: 56px;
   background: ${({ theme }) => theme.colors.bgCard};
@@ -74,19 +98,25 @@ export const NavUser = styled.div`
   position: relative;
 `;
 
-export const NavBalance = styled.div`
+export const NavBalance = styled.div<{ $animate?: boolean }>`
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 6px 10px;
   background: rgba(64, 192, 128, 0.15);
   border-radius: 20px;
+  transition: all 0.3s ease;
+  
+  ${({ $animate }) => $animate && css`
+    animation: ${balancePop} 0.4s ease, ${balanceGlow} 0.6s ease;
+  `}
 `;
 
 export const BalanceValue = styled.span`
   font-weight: 700;
   font-size: 0.9rem;
   color: ${({ theme }) => theme.colors.green};
+  transition: all 0.3s ease;
 `;
 
 export const BalanceIcon = styled.span`

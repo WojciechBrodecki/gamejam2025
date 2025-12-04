@@ -20,6 +20,7 @@ import {
   WinnerChance,
   PlayersLegend,
   PlayerLegendItem,
+  PlayerLegendAvatar,
   PlayerPercent,
 } from '../styles/BetWheel.styles';
 
@@ -179,7 +180,7 @@ const BetWheel: React.FC<BetWheelProps> = ({
 
     // Oblicz docelowy kąt
     const winningAngle = (winner.winningNumber / totalPool) * 360;
-    const spins = 5; // 5 pełnych obrotów
+    const spins = 3; // 3 pełne obroty
     
     // Normalizuj aktualną rotację do 0-360
     const currentNormalizedRotation = rotation % 360;
@@ -195,7 +196,7 @@ const BetWheel: React.FC<BetWheelProps> = ({
     const targetRotation = rotation + (spins * 360) + additionalRotation;
 
     // Animacja kręcenia - 1 obrót na sekundę = 5 sekund na 5 obrotów
-    const duration = 3000; // 3 sekundy
+    const duration = 2000; // 2 sekundy
     const startTime = Date.now();
     const startRotation = rotation;
 
@@ -241,6 +242,7 @@ const BetWheel: React.FC<BetWheelProps> = ({
         setDisplayBets([]);
         setDisplayPool(0);
         setWinnerData(null);
+        setRotation(0); // Reset koła do pozycji początkowej
         onWinnerShown?.();
       }, 3000);
       return () => clearTimeout(timeout);
@@ -268,6 +270,7 @@ const BetWheel: React.FC<BetWheelProps> = ({
     }
 
     const segments: JSX.Element[] = [];
+    const avatars: JSX.Element[] = [];
     let currentAngle = -90;
 
     aggregatedBets.forEach((player) => {
@@ -301,10 +304,77 @@ const BetWheel: React.FC<BetWheelProps> = ({
         />
       );
 
+      // Dodaj avatar na środku segmentu (tylko jeśli segment jest wystarczająco duży)
+      if (angle >= 20) {
+        const midAngle = (startAngle + endAngle) / 2;
+        const midRad = (midAngle * Math.PI) / 180;
+        const avatarRadius = 6;
+        const avatarDistance = 36; // odległość od środka koła
+        const ax = 50 + avatarDistance * Math.cos(midRad);
+        const ay = 50 + avatarDistance * Math.sin(midRad);
+
+        avatars.push(
+          <g key={`avatar-${player.playerId}`}>
+            {/* Tło z kolorem gracza */}
+            <circle 
+              cx={ax} 
+              cy={ay} 
+              r={avatarRadius} 
+              fill={player.color}
+              stroke="#fff"
+              strokeWidth="0.5"
+            />
+            {/* Literka jako fallback */}
+            <text
+              x={ax}
+              y={ay + 0.5}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize="6"
+              fill="#0d0d14"
+              fontWeight="bold"
+              style={{ pointerEvents: 'none' }}
+            >
+              {player.username.charAt(0).toUpperCase()}
+            </text>
+            {/* Avatar używając foreignObject z HTML img */}
+            <foreignObject
+              x={ax - avatarRadius}
+              y={ay - avatarRadius}
+              width={avatarRadius * 2}
+              height={avatarRadius * 2}
+            >
+              <div 
+                style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  borderRadius: '50%', 
+                  overflow: 'hidden' 
+                }}
+              >
+                <img
+                  src={`${API_BASE_URL}/api/players/${player.playerId}/avatar`}
+                  alt=""
+                  style={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    objectFit: 'cover',
+                    display: 'block'
+                  }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            </foreignObject>
+          </g>
+        );
+      }
+
       currentAngle = endAngle;
     });
 
-    return segments;
+    return [...segments, ...avatars];
   };
 
   return (
@@ -379,6 +449,16 @@ const BetWheel: React.FC<BetWheelProps> = ({
               $color={player.color}
               $isYou={player.playerId === currentPlayerId}
             >
+              <PlayerLegendAvatar $color={player.color}>
+                <img 
+                  src={`${API_BASE_URL}/api/players/${player.playerId}/avatar`}
+                  alt={player.username}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+                {player.username.charAt(0).toUpperCase()}
+              </PlayerLegendAvatar>
               {player.username}
               <PlayerPercent>{player.percent.toFixed(1)}%</PlayerPercent>
             </PlayerLegendItem>
