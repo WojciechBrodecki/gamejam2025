@@ -33,14 +33,15 @@ export type RoomStatus = 'waiting' | 'active' | 'closed';
 export interface Room {
   id: string;
   name: string;
-  maxPlayers: number;
+  maxPlayers: number; // Max betters per round (private rooms always have 2)
   minBet: number;
-  maxBet: number;
+  maxBet: number; // Max total bets per player in a round
   roundDurationMs: number;
   type: RoomType;
   inviteCode?: string;
   creatorId: string;
-  playerCount: number;
+  playerCount: number; // People in room (spectators + players)
+  currentBetterCount: number; // Players who bet in current round
   status: RoomStatus;
   createdAt: Date;
 }
@@ -100,11 +101,11 @@ export interface WSMessage<T = any> {
 }
 
 // Room-related payloads
+// Private rooms are always 1v1 (2 players), maxBet is the total sum of bets per player
 export interface CreateRoomPayload {
   name: string;
-  maxPlayers: number;
   minBet: number;
-  maxBet: number;
+  maxBet: number; // Max total bets per player in a round
   roundDurationMs: number;
 }
 

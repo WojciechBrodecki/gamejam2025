@@ -5,7 +5,6 @@ import { WebSocketService } from './WebSocketService';
 
 export interface CreateRoomOptions {
   name: string;
-  maxPlayers: number;
   minBet: number;
   maxBet: number;
   roundDurationMs: number;
@@ -101,10 +100,11 @@ export class RoomService {
 
     const roomId = uuidv4();
     
+    // Private rooms always have exactly 2 players
     const room = new Room({
       id: roomId,
       name: options.name,
-      maxPlayers: options.maxPlayers,
+      maxPlayers: 2, // Private rooms are always 1v1
       minBet: options.minBet,
       maxBet: options.maxBet,
       roundDurationMs: options.roundDurationMs,
@@ -164,10 +164,7 @@ export class RoomService {
       return { success: true, message: 'Already in room', room };
     }
 
-    if (room.playerIds.length >= room.maxPlayers) {
-      return { success: false, message: 'Room is full' };
-    }
-
+    // No limit on joining - maxPlayers limits betters, not spectators
     room.playerIds.push(playerId);
     await room.save();
 
@@ -462,9 +459,31 @@ export class RoomService {
       return { success: false, message: 'No active round in this room' };
     }
 
-    // Use room-specific bet limits
-    if (amount < room.minBet || amount > room.maxBet) {
-      return { success: false, message: `Bet must be between ${room.minBet} and ${room.maxBet}` };
+    // Check if player limit for betters has been reached
+    const uniqueBetterIds = new Set(state.currentRound.bets.map(b => b.playerId));
+    const playerAlreadyBet = uniqueBetterIds.has(playerId);
+    
+    if (!playerAlreadyBet && uniqueBetterIds.size >= room.maxPlayers) {
+      return { success: false, message: `Maximum ${room.maxPlayers} players can bet in this round` };
+    }
+
+    // Check minimum bet per single bet
+    if (amount < room.minBet) {
+      return { success: false, message: `Single bet must be at least ${room.minBet}` };
+    }
+
+    // Calculate current total bets for this player in this round
+    const currentPlayerTotalBets = state.currentRound.bets
+      .filter(b => b.playerId === playerId)
+      .reduce((sum, b) => sum + b.amount, 0);
+
+    // Check if new bet would exceed max total bet limit
+    if (currentPlayerTotalBets + amount > room.maxBet) {
+      const remaining = room.maxBet - currentPlayerTotalBets;
+      if (remaining <= 0) {
+        return { success: false, message: `You have reached the maximum bet limit of ${room.maxBet}` };
+      }
+      return { success: false, message: `You can only bet up to ${remaining} more (max total: ${room.maxBet})` };
     }
 
     const player = await Player.findOne({ id: playerId });
@@ -685,17 +704,24 @@ export class RoomService {
   }
 
   formatRoom(room: IRoom) {
+    // Get number of unique betters in current round
+    const state = this.roomStates.get(room.id);
+    const currentRoundBetterCount = state?.currentRound 
+      ? new Set(state.currentRound.bets.map(b => b.playerId)).size 
+      : 0;
+
     return {
       id: room.id,
       name: room.name,
-      maxPlayers: room.maxPlayers,
+      maxPlayers: room.maxPlayers, // Max betters per round
       minBet: room.minBet,
       maxBet: room.maxBet,
       roundDurationMs: room.roundDurationMs,
       type: room.type,
       inviteCode: room.inviteCode,
       creatorId: room.creatorId,
-      playerCount: room.playerIds.length,
+      playerCount: room.playerIds.length, // People in room (spectators + players)
+      currentBetterCount: currentRoundBetterCount, // Players who bet in current round
       status: room.status,
       createdAt: room.createdAt,
     };

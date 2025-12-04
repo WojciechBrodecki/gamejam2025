@@ -263,7 +263,6 @@ export class WebSocketService {
 
   private async handleCreateRoom(ws: ExtendedWebSocket, payload: {
     name: string;
-    maxPlayers: number;
     minBet: number;
     maxBet: number;
     roundDurationMs: number;
@@ -278,14 +277,13 @@ export class WebSocketService {
     }
 
     try {
-      // Players can only create private rooms
+      // Players can only create private rooms (always 2 players)
       const room = await roomService.createRoom({
         name: payload.name,
-        maxPlayers: payload.maxPlayers,
         minBet: payload.minBet,
         maxBet: payload.maxBet,
         roundDurationMs: payload.roundDurationMs,
-        type: 'private', // Always private for player-created rooms
+        type: 'private',
         creatorId: ws.playerId,
       });
 
