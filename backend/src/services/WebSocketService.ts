@@ -54,8 +54,15 @@ export class WebSocketService {
         }
       });
 
-      ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
+      ws.on('error', (error: Error & { code?: string }) => {
+        // Ignore common WebSocket errors from invalid connections
+        const ignoredCodes = ['WS_ERR_INVALID_CLOSE_CODE', 'WS_ERR_INVALID_UTF8', 'ECONNRESET'];
+        if (error.code && ignoredCodes.includes(error.code)) {
+          // Silently ignore these errors - they're from invalid HTTP connections
+          this.clients.delete(ws);
+          return;
+        }
+        console.error('WebSocket error:', error.message);
         this.clients.delete(ws);
       });
     });

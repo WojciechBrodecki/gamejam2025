@@ -37,12 +37,20 @@ module.exports = {
     compress: true,
     port: 3000,
     hot: true,
-    proxy: {
-      '/api': 'http://localhost:3001',
-      '/ws': {
-        target: 'ws://localhost:3001',
-        ws: true,
+    proxy: [
+      {
+        context: ['/api'],
+        target: 'http://localhost:3001',
       },
+      {
+        context: ['/ws'],
+        target: 'http://localhost:3001',
+        ws: true,
+        changeOrigin: true,
+      },
+    ],
+    client: {
+      webSocketURL: 'auto://0.0.0.0:0/ws',
     },
   },
   mode: 'development',
