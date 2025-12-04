@@ -266,6 +266,7 @@ export class WebSocketService {
     maxPlayers: number;
     minBet: number;
     maxBet: number;
+    roundDurationMs: number;
   }): Promise<void> {
     if (!ws.playerId) {
       this.sendToClient(ws, {
@@ -283,6 +284,7 @@ export class WebSocketService {
         maxPlayers: payload.maxPlayers,
         minBet: payload.minBet,
         maxBet: payload.maxBet,
+        roundDurationMs: payload.roundDurationMs,
         type: 'private', // Always private for player-created rooms
         creatorId: ws.playerId,
       });

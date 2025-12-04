@@ -36,6 +36,7 @@ export interface Room {
   maxPlayers: number;
   minBet: number;
   maxBet: number;
+  roundDurationMs: number;
   type: RoomType;
   inviteCode?: string;
   creatorId: string;
@@ -104,7 +105,7 @@ export interface CreateRoomPayload {
   maxPlayers: number;
   minBet: number;
   maxBet: number;
-  type: RoomType;
+  roundDurationMs: number;
 }
 
 export interface JoinRoomPayload {

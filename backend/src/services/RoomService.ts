@@ -8,6 +8,7 @@ export interface CreateRoomOptions {
   maxPlayers: number;
   minBet: number;
   maxBet: number;
+  roundDurationMs: number;
   type: RoomType;
   creatorId: string;
 }
@@ -17,6 +18,7 @@ export interface DefaultRoomConfig {
   minBet: number;
   maxBet: number;
   maxPlayers: number;
+  roundDurationMs: number;
 }
 
 export interface RoomRoundState {
@@ -55,13 +57,14 @@ export class RoomService {
           maxPlayers: roomConfig.maxPlayers,
           minBet: roomConfig.minBet,
           maxBet: roomConfig.maxBet,
+          roundDurationMs: roomConfig.roundDurationMs,
           type: 'public',
           creatorId: 'SYSTEM', // System-created room
           playerIds: [],
           status: 'waiting',
         });
         await room.save();
-        console.log(`Created default public room: ${roomConfig.name}`);
+        console.log(`Created default public room: ${roomConfig.name} (round: ${roomConfig.roundDurationMs / 1000}s)`);
       } else {
         // Ensure room is not closed
         if (room.status === 'closed') {
@@ -104,6 +107,7 @@ export class RoomService {
       maxPlayers: options.maxPlayers,
       minBet: options.minBet,
       maxBet: options.maxBet,
+      roundDurationMs: options.roundDurationMs,
       type: 'private',
       inviteCode: this.generateInviteCode(),
       creatorId: options.creatorId,
@@ -336,8 +340,11 @@ export class RoomService {
     const room = await Room.findOne({ id: roomId });
     if (!room) return;
 
+    // Use room-specific round duration
+    const roundDuration = room.roundDurationMs;
+
     const now = new Date();
-    const endTime = new Date(now.getTime() + config.roundDurationMs);
+    const endTime = new Date(now.getTime() + roundDuration);
 
     state.currentRound.startTime = now;
     state.currentRound.endTime = endTime;
@@ -353,7 +360,7 @@ export class RoomService {
       payload: {
         roomId,
         round: this.formatRound(state.currentRound),
-        timeRemaining: config.roundDurationMs,
+        timeRemaining: roundDuration,
       },
       timestamp: Date.now(),
     });
@@ -361,12 +368,12 @@ export class RoomService {
     // Set timer for round end
     state.roundTimer = setTimeout(() => {
       this.endRound(roomId);
-    }, config.roundDurationMs);
+    }, roundDuration);
 
     // Start round updates
     this.startRoundUpdates(roomId);
 
-    console.log(`Round activated for room ${room.name}: ${state.currentRound.id}`);
+    console.log(`Round activated for room ${room.name}: ${state.currentRound.id} (duration: ${roundDuration / 1000}s)`);
   }
 
   private startRoundUpdates(roomId: string): void {
@@ -653,7 +660,7 @@ export class RoomService {
     return {
       roomId: room.id,
       roomName: room.name,
-      roundDurationMs: config.roundDurationMs,
+      roundDurationMs: room.roundDurationMs,
       casinoCommissionPercent: config.casinoCommissionPercent,
       minBet: room.minBet,
       maxBet: room.maxBet,
@@ -684,6 +691,7 @@ export class RoomService {
       maxPlayers: room.maxPlayers,
       minBet: room.minBet,
       maxBet: room.maxBet,
+      roundDurationMs: room.roundDurationMs,
       type: room.type,
       inviteCode: room.inviteCode,
       creatorId: room.creatorId,

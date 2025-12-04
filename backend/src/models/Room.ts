@@ -9,6 +9,7 @@ export interface IRoom extends Document {
   maxPlayers: number;
   minBet: number;
   maxBet: number;
+  roundDurationMs: number; // Round duration in milliseconds per room
   type: RoomType;
   inviteCode?: string; // Required for private rooms
   creatorId: string;
@@ -24,6 +25,7 @@ const RoomSchema: Schema = new Schema({
   maxPlayers: { type: Number, required: true, min: 2, max: 100 },
   minBet: { type: Number, required: true, min: 1 },
   maxBet: { type: Number, required: true },
+  roundDurationMs: { type: Number, required: true, min: 10000 }, // Min 10 seconds
   type: { type: String, enum: ['public', 'private'], required: true },
   inviteCode: { type: String, sparse: true }, // Only for private rooms
   creatorId: { type: String, required: true },
