@@ -1,7 +1,56 @@
 import { Router, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import { gameService } from '../services';
+import { config } from '../config';
 
 const router = Router();
+
+// Set to track used nicknames (persists in memory, resets on server restart)
+// For production, you'd want to check against the Player collection in MongoDB
+const usedNicknames = new Set<string>();
+
+// Login endpoint - creates JWT token for a unique nickname
+router.get('/login/:nickname', async (req: Request, res: Response) => {
+  try {
+    const { nickname } = req.params;
+
+    if (!nickname || nickname.trim() === '') {
+      return res.status(400).json({ success: false, message: 'Nickname is required' });
+    }
+
+    const trimmedNickname = nickname.trim();
+
+    // Check if nickname was already used in this session
+    if (usedNicknames.has(trimmedNickname.toLowerCase())) {
+      return res.status(409).json({ success: false, message: 'Nickname already taken' });
+    }
+
+    // Check if player with this username already exists in database
+    const existingPlayer = await gameService.getPlayerByUsername(trimmedNickname);
+    if (existingPlayer) {
+      return res.status(409).json({ success: false, message: 'Nickname already taken' });
+    }
+
+    // Mark nickname as used
+    usedNicknames.add(trimmedNickname.toLowerCase());
+
+    // Create JWT token with nickname
+    const token = jwt.sign(
+      { nickname: trimmedNickname },
+      config.jwtSecret,
+      { expiresIn: '24h' }
+    );
+
+    res.json({
+      success: true,
+      token,
+      nickname: trimmedNickname,
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
 
 // Get current game state
 router.get('/game/state', async (req: Request, res: Response) => {

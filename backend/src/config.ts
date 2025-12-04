@@ -8,6 +8,7 @@ export interface Config {
   casinoCommissionPercent: number;
   minBet: number;
   maxBet: number;
+  jwtSecret: string;
 }
 
 export const config: Config = {
@@ -16,4 +17,5 @@ export const config: Config = {
   casinoCommissionPercent: parseFloat(process.env.CASINO_COMMISSION_PERCENT || '5'),
   minBet: parseInt(process.env.MIN_BET || '1', 10),
   maxBet: parseInt(process.env.MAX_BET || '10000', 10),
+  jwtSecret: process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production',
 };

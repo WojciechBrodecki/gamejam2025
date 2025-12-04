@@ -1,7 +1,15 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import { Server, IncomingMessage } from 'http';
 import { Socket } from 'net';
+import jwt from 'jsonwebtoken';
 import { gameService } from './GameService';
+import { config } from '../config';
+
+interface JwtPayload {
+  nickname: string;
+  iat: number;
+  exp: number;
+}
 
 interface ExtendedWebSocket extends WebSocket {
   playerId?: string;
@@ -15,15 +23,56 @@ export class WebSocketService {
 
   constructor(server: Server) {
     // Use noServer mode for manual upgrade handling
-    this.wss = new WebSocketServer({ server });
+    this.wss = new WebSocketServer({ noServer: true });
     this.init();
+    this.setupUpgradeHandler(server);
+  }
+
+  private setupUpgradeHandler(server: Server): void {
+    server.on('upgrade', (request: IncomingMessage, socket: Socket, head: Buffer) => {
+      const url = request.url || '';
+      
+      // Extract token from URL path: /ws/{token}
+      const match = url.match(/^\/ws\/(.+)$/);
+      
+      if (!match) {
+        socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+
+      const token = match[1];
+
+      try {
+        // Verify JWT token
+        const decoded = jwt.verify(token, config.jwtSecret) as JwtPayload;
+        
+        // Attach nickname to request for later use
+        (request as any).nickname = decoded.nickname;
+
+        this.wss.handleUpgrade(request, socket, head, (ws) => {
+          this.wss.emit('connection', ws, request);
+        });
+      } catch (error) {
+        console.error('JWT verification failed:', error);
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+        socket.destroy();
+      }
+    });
   }
 
   private init(): void {
-    this.wss.on('connection', (ws: ExtendedWebSocket) => {
-      console.log('New WebSocket connection established');
+    this.wss.on('connection', async (ws: ExtendedWebSocket, request: IncomingMessage) => {
+      const nickname = (request as any).nickname;
+      console.log(`New WebSocket connection established for user: ${nickname}`);
+      
       ws.isAlive = true;
       this.clients.add(ws);
+
+      // Auto-join the player using the nickname from JWT
+      if (nickname) {
+        await this.autoJoinPlayer(ws, nickname);
+      }
 
       ws.on('pong', () => {
         ws.isAlive = true;
@@ -71,7 +120,7 @@ export class WebSocketService {
       // Send a welcome message to confirm connection is stable
       this.sendToClient(ws, {
         type: 'CONNECTED',
-        payload: { message: 'WebSocket connection established' },
+        payload: { message: 'WebSocket connection established', username: nickname },
         timestamp: Date.now(),
       });
     });
@@ -87,6 +136,31 @@ export class WebSocketService {
         ws.ping();
       });
     }, 30000);
+  }
+
+  private async autoJoinPlayer(ws: ExtendedWebSocket, nickname: string): Promise<void> {
+    let player = await gameService.getPlayerByUsername(nickname);
+    
+    if (!player) {
+      player = await gameService.createPlayer(nickname);
+    }
+
+    ws.playerId = player.id;
+    ws.playerUsername = player.username;
+
+    // Broadcast player joined
+    this.broadcast({
+      type: 'PLAYER_JOINED',
+      payload: { 
+        playerId: player.id, 
+        username: player.username,
+        balance: player.balance,
+      },
+      timestamp: Date.now(),
+    });
+
+    // Send current state to the joining player
+    await this.handleSyncState(ws);
   }
 
   private async handleMessage(ws: ExtendedWebSocket, message: any): Promise<void> {
