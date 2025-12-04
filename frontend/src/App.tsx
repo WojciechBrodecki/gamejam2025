@@ -1,19 +1,41 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
-import { GameState, Round, Player, GameConfig, WSMessage } from './types';
+import { GameState, Player } from './types';
+import {
+  Navbar,
+  Sidebar,
+  GrandWager,
+  NotFound,
+  WinnerModal,
+  LoginScreen,
+  Room,
+} from './components';
+import './styles.css';
+
+// Domyślne pokoje
+const defaultRooms: Room[] = [
+  { id: 'open-1', name: 'Główny Pokój', type: 'open-limit', minBet: 1, maxBet: 10000, playersCount: 0 },
+  { id: 'open-2', name: 'High Roller', type: 'open-limit', minBet: 100, maxBet: 50000, playersCount: 0 },
+  { id: '1v1-1', name: 'Arena #1', type: '1:1', minBet: 50, playersCount: 0 },
+  { id: '1v1-2', name: 'Arena #2', type: '1:1', minBet: 100, playersCount: 0 },
+];
 
 const App: React.FC = () => {
   const { isConnected, lastMessage, sendMessage } = useWebSocket();
-  
-  const [username, setUsername] = useState('');
+
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [player, setPlayer] = useState<Player | null>(null);
+  const [currentGame, setCurrentGame] = useState<'grand-wager' | 'test-gra'>('grand-wager');
+  const [selectedRoom, setSelectedRoom] = useState('open-1');
+  const [rooms, setRooms] = useState<Room[]>(defaultRooms);
+  
   const [gameState, setGameState] = useState<GameState>({
     currentRound: null,
     config: null,
     players: [],
     playerId: null,
   });
+  
   const [betAmount, setBetAmount] = useState<string>('10');
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [winner, setWinner] = useState<{ username: string; amount: number } | null>(null);
@@ -39,6 +61,11 @@ const App: React.FC = () => {
             setPlayer(currentPlayer);
           }
         }
+        // Update room player counts
+        setRooms(prev => prev.map(room => ({
+          ...room,
+          playersCount: lastMessage.payload.players?.length || 0,
+        })));
         break;
 
       case 'ROUND_START':
@@ -55,19 +82,12 @@ const App: React.FC = () => {
           ...prev,
           currentRound: lastMessage.payload.round,
         }));
-        // Update player balance if it's our bet
         if (player) {
-          const myBet = lastMessage.payload.round.bets.find(
-            (b: any) => b.playerId === player.id
-          );
-          if (myBet) {
-            // Refresh player data
-            sendMessage({
-              type: 'SYNC_STATE',
-              payload: {},
-              timestamp: Date.now(),
-            });
-          }
+          sendMessage({
+            type: 'SYNC_STATE',
+            payload: {},
+            timestamp: Date.now(),
+          });
         }
         break;
 
@@ -76,7 +96,6 @@ const App: React.FC = () => {
           username: lastMessage.payload.winner.username,
           amount: lastMessage.payload.winner.amountWon,
         });
-        // Refresh state after round end
         setTimeout(() => {
           sendMessage({
             type: 'SYNC_STATE',
@@ -120,16 +139,26 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [gameState.currentRound]);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!username.trim()) return;
-
+  const handleLogin = (username: string) => {
     sendMessage({
       type: 'JOIN_GAME',
-      payload: { username: username.trim() },
+      payload: { username },
       timestamp: Date.now(),
     });
     setIsLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setPlayer(null);
+    setGameState({
+      currentRound: null,
+      config: null,
+      players: [],
+      playerId: null,
+    });
+    // Reload to reset WebSocket connection
+    window.location.reload();
   };
 
   const handlePlaceBet = () => {
@@ -150,7 +179,6 @@ const App: React.FC = () => {
       timestamp: Date.now(),
     });
 
-    // Optimistically update balance
     if (player) {
       setPlayer({ ...player, balance: player.balance - amount });
     }
@@ -160,181 +188,82 @@ const App: React.FC = () => {
     setBetAmount(amount.toString());
   };
 
-  const formatTime = (ms: number): string => {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  const handleGameChange = (game: 'grand-wager' | 'test-gra') => {
+    setCurrentGame(game);
   };
 
-  const calculateChance = (bet: { playerId: string; amount: number }): string => {
-    if (!gameState.currentRound || gameState.currentRound.totalPool === 0) return '0%';
-    return ((bet.amount / gameState.currentRound.totalPool) * 100).toFixed(1) + '%';
+  const handleAvatarChange = () => {
+    // TODO: Implementacja zmiany avatara
+    alert('Funkcja zmiany avatara będzie dostępna wkrótce!');
   };
 
   // Login screen
   if (!isLoggedIn) {
-    return (
-      <div className="app">
-        <div className="header">
-          <h1>🎰 CASINO</h1>
-          <p className="subtitle">Gra Losowa z Pulą</p>
-        </div>
-        <form className="login-form" onSubmit={handleLogin}>
-          <h2>Dołącz do gry</h2>
-          <input
-            type="text"
-            placeholder="Wprowadź nazwę użytkownika"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoFocus
-          />
-          <button type="submit" disabled={!isConnected}>
-            {isConnected ? 'Wejdź do kasyna' : 'Łączenie...'}
-          </button>
-        </form>
-        <div className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
-          {isConnected ? '● Połączono' : '○ Rozłączono'}
-        </div>
-      </div>
-    );
+    return <LoginScreen isConnected={isConnected} onLogin={handleLogin} />;
   }
 
-  // Game screen
+  // Main game layout
   return (
-    <div className="app">
-      <div className="header">
-        <h1>🎰 CASINO</h1>
-        <p className="subtitle">Gra Losowa z Pulą</p>
+    <div className="app-layout">
+      <Navbar
+        casinoName="🎰 ROYAL CASINO"
+        balance={player?.balance || 1000}
+        username={player?.username || 'Gracz'}
+        currentGame={currentGame}
+        onGameChange={handleGameChange}
+        onLogout={handleLogout}
+        onAvatarChange={handleAvatarChange}
+      />
+
+      <div className="main-content">
+        {currentGame === 'grand-wager' && (
+          <Sidebar
+            rooms={rooms}
+            selectedRoomId={selectedRoom}
+            onRoomSelect={setSelectedRoom}
+          />
+        )}
+
+        <main className="game-area">
+          {error && (
+            <div className="error-toast">
+              <span>⚠️</span>
+              {error}
+            </div>
+          )}
+
+          {currentGame === 'grand-wager' ? (
+            <GrandWager
+              player={player}
+              currentRound={gameState.currentRound}
+              config={gameState.config}
+              timeRemaining={timeRemaining}
+              betAmount={betAmount}
+              onBetAmountChange={setBetAmount}
+              onPlaceBet={handlePlaceBet}
+              onQuickBet={handleQuickBet}
+            />
+          ) : (
+            <NotFound
+              gameName="TEST_GRA"
+              onGoBack={() => setCurrentGame('grand-wager')}
+            />
+          )}
+        </main>
       </div>
 
-      <div className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
-        {isConnected ? '● Połączono' : '○ Rozłączono'}
-      </div>
-
-      {error && <div className="error-message">{error}</div>}
-
-      <div className="game-container">
-        <div className="main-panel">
-          <div className="timer-section">
-            <h3>Czas do końca rundy</h3>
-            <div className={`timer ${timeRemaining < 10000 ? 'warning' : ''}`}>
-              {formatTime(timeRemaining)}
-            </div>
-          </div>
-
-          <div className="pool-section">
-            <h3>Aktualna pula</h3>
-            <div className="pool-amount">
-              {gameState.currentRound?.totalPool.toFixed(2) || '0.00'} 💰
-            </div>
-            {gameState.config && (
-              <p style={{ marginTop: '10px', color: '#94a3b8', fontSize: '0.9rem' }}>
-                Prowizja kasyna: {gameState.config.casinoCommissionPercent}%
-              </p>
-            )}
-          </div>
-
-          <div className="bet-section">
-            <h3>Postaw zakład</h3>
-            <div className="bet-input-group">
-              <input
-                type="number"
-                className="bet-input"
-                value={betAmount}
-                onChange={(e) => setBetAmount(e.target.value)}
-                min={gameState.config?.minBet || 1}
-                max={gameState.config?.maxBet || 10000}
-              />
-              <button
-                className="bet-button"
-                onClick={handlePlaceBet}
-                disabled={!gameState.currentRound || gameState.currentRound.status === 'finished'}
-              >
-                Postaw
-              </button>
-            </div>
-            <div className="quick-bets">
-              {[10, 50, 100, 250, 500].map((amount) => (
-                <button
-                  key={amount}
-                  className="quick-bet"
-                  onClick={() => handleQuickBet(amount)}
-                >
-                  {amount}
-                </button>
-              ))}
-              {player && (
-                <button
-                  className="quick-bet"
-                  onClick={() => handleQuickBet(player.balance)}
-                >
-                  ALL IN
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="bets-list">
-            <h3>Zakłady w tej rundzie ({gameState.currentRound?.bets.length || 0})</h3>
-            {gameState.currentRound?.bets.map((bet, index) => (
-              <div key={index} className="bet-item">
-                <span className="username">
-                  {bet.playerUsername}
-                  {bet.playerId === player?.id && ' (Ty)'}
-                </span>
-                <span className="amount">{bet.amount} 💰</span>
-                <span className="chance">{calculateChance(bet)}</span>
-              </div>
-            ))}
-            {(!gameState.currentRound?.bets || gameState.currentRound.bets.length === 0) && (
-              <p style={{ textAlign: 'center', color: '#94a3b8', padding: '20px' }}>
-                Brak zakładów w tej rundzie
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="side-panel">
-          <div className="player-info">
-            <h3>Twoje konto</h3>
-            <div className="username">{player?.username || username}</div>
-            <div className="balance">{player?.balance.toFixed(2) || '1000.00'} 💰</div>
-          </div>
-
-          <div style={{ marginTop: '20px' }}>
-            <h3 style={{ color: '#94a3b8', marginBottom: '15px' }}>Zasady gry</h3>
-            <ul style={{ color: '#94a3b8', fontSize: '0.9rem', paddingLeft: '20px' }}>
-              <li style={{ marginBottom: '10px' }}>
-                Każda runda trwa {gameState.config ? gameState.config.roundDurationMs / 1000 : 60} sekund
-              </li>
-              <li style={{ marginBottom: '10px' }}>
-                Im więcej postawisz, tym większa szansa na wygraną
-              </li>
-              <li style={{ marginBottom: '10px' }}>
-                Zwycięzca otrzymuje całą pulę minus {gameState.config?.casinoCommissionPercent || 5}% prowizji
-              </li>
-              <li>
-                Możesz stawiać wielokrotnie w jednej rundzie
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      {/* Winner overlay */}
       {winner && (
-        <div className="winner-overlay" onClick={() => setWinner(null)}>
-          <div className="winner-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>🎉 MAMY ZWYCIĘZCĘ! 🎉</h2>
-            <div className="winner-name">{winner.username}</div>
-            <div className="winner-amount">+{winner.amount.toFixed(2)} 💰</div>
-            <button className="close-btn" onClick={() => setWinner(null)}>
-              Kontynuuj grę
-            </button>
-          </div>
-        </div>
+        <WinnerModal
+          username={winner.username}
+          amount={winner.amount}
+          isCurrentPlayer={winner.username === player?.username}
+          onClose={() => setWinner(null)}
+        />
       )}
+
+      <div className={`connection-status-indicator ${isConnected ? 'online' : 'offline'}`}>
+        <span className="status-dot"></span>
+      </div>
     </div>
   );
 };
