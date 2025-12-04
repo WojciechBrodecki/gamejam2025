@@ -1,4 +1,20 @@
 import React from 'react';
+import {
+  SidebarOverlay,
+  SidebarWrapper,
+  SidebarHeader,
+  CloseButton,
+  SidebarSection,
+  SectionTitle,
+  RoomList,
+  RoomItem,
+  RoomName,
+  RoomMeta,
+  GameList,
+  GameItem,
+  GameIcon,
+  GameName,
+} from '../styles/Sidebar.styles';
 
 export interface Room {
   id: string;
@@ -10,71 +26,106 @@ export interface Room {
 }
 
 interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
   rooms: Room[];
   selectedRoomId: string;
   onRoomSelect: (roomId: string) => void;
+  currentGame: 'grand-wager' | 'test-gra';
+  onGameChange: (game: 'grand-wager' | 'test-gra') => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ rooms, selectedRoomId, onRoomSelect }) => {
+const Sidebar: React.FC<SidebarProps> = ({ 
+  isOpen, 
+  onClose, 
+  rooms, 
+  selectedRoomId, 
+  onRoomSelect,
+  currentGame,
+  onGameChange,
+}) => {
   const openLimitRooms = rooms.filter(r => r.type === 'open-limit');
   const oneToOneRooms = rooms.filter(r => r.type === '1:1');
 
+  const handleRoomClick = (roomId: string) => {
+    onRoomSelect(roomId);
+    onClose();
+  };
+
+  const handleGameClick = (game: 'grand-wager' | 'test-gra') => {
+    onGameChange(game);
+    if (game === 'test-gra') {
+      onClose();
+    }
+  };
+
   return (
-    <aside className="sidebar">
-      <div className="sidebar-header">
-        <h3>Pokoje</h3>
-      </div>
+    <>
+      <SidebarOverlay $visible={isOpen} onClick={onClose} />
+      
+      <SidebarWrapper $open={isOpen}>
+        <SidebarHeader>
+          <h2>Menu</h2>
+          <CloseButton onClick={onClose}>✕</CloseButton>
+        </SidebarHeader>
 
-      <div className="room-section">
-        <h4 className="room-section-title">
-          <span className="section-icon">🎲</span>
-          Open Limit
-        </h4>
-        <div className="room-list">
-          {openLimitRooms.map(room => (
-            <button
-              key={room.id}
-              className={`room-item ${selectedRoomId === room.id ? 'active' : ''}`}
-              onClick={() => onRoomSelect(room.id)}
+        <SidebarSection>
+          <SectionTitle>Gry</SectionTitle>
+          <GameList>
+            <GameItem 
+              $active={currentGame === 'grand-wager'}
+              onClick={() => handleGameClick('grand-wager')}
             >
-              <div className="room-info">
-                <span className="room-name">{room.name}</span>
-                <span className="room-players">{room.playersCount} graczy</span>
-              </div>
-              <div className="room-limits">
-                {room.minBet && room.maxBet && (
-                  <span>{room.minBet} - {room.maxBet} 💰</span>
-                )}
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
+              <GameIcon>GW</GameIcon>
+              <GameName>GRAND WAGER</GameName>
+            </GameItem>
+            <GameItem 
+              $active={currentGame === 'test-gra'}
+              onClick={() => handleGameClick('test-gra')}
+            >
+              <GameIcon>TG</GameIcon>
+              <GameName>TEST_GRA</GameName>
+            </GameItem>
+          </GameList>
+        </SidebarSection>
 
-      <div className="room-section">
-        <h4 className="room-section-title">
-          <span className="section-icon">⚔️</span>
-          Pojedynki 1:1
-        </h4>
-        <div className="room-list">
-          {oneToOneRooms.map(room => (
-            <button
-              key={room.id}
-              className={`room-item ${selectedRoomId === room.id ? 'active' : ''}`}
-              onClick={() => onRoomSelect(room.id)}
-            >
-              <div className="room-info">
-                <span className="room-name">{room.name}</span>
-                <span className="room-players">{room.playersCount}/2 graczy</span>
-              </div>
-              <div className="room-limits">
-                {room.minBet && <span>Wejście: {room.minBet} 💰</span>}
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </aside>
+        {currentGame === 'grand-wager' && (
+          <>
+            <SidebarSection>
+              <SectionTitle>Open Limit</SectionTitle>
+              <RoomList>
+                {openLimitRooms.map(room => (
+                  <RoomItem
+                    key={room.id}
+                    $active={selectedRoomId === room.id}
+                    onClick={() => handleRoomClick(room.id)}
+                  >
+                    <RoomName>{room.name}</RoomName>
+                    <RoomMeta>{room.playersCount} online</RoomMeta>
+                  </RoomItem>
+                ))}
+              </RoomList>
+            </SidebarSection>
+
+            <SidebarSection>
+              <SectionTitle>Pojedynki 1:1</SectionTitle>
+              <RoomList>
+                {oneToOneRooms.map(room => (
+                  <RoomItem
+                    key={room.id}
+                    $active={selectedRoomId === room.id}
+                    onClick={() => handleRoomClick(room.id)}
+                  >
+                    <RoomName>{room.name}</RoomName>
+                    <RoomMeta>{room.playersCount}/2</RoomMeta>
+                  </RoomItem>
+                ))}
+              </RoomList>
+            </SidebarSection>
+          </>
+        )}
+      </SidebarWrapper>
+    </>
   );
 };
 

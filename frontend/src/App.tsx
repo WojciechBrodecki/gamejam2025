@@ -6,13 +6,20 @@ import {
   Sidebar,
   GrandWager,
   NotFound,
-  WinnerModal,
   LoginScreen,
   Room,
 } from './components';
-import './styles.css';
+import {
+  AppWrapper,
+  MainContent,
+  ErrorToast,
+  ConnectionDot,
+  TestGraPlaceholder,
+  PlaceholderIcon,
+  PlaceholderTitle,
+  PlaceholderText,
+} from './styles/App.styles';
 
-// Domyślne pokoje
 const defaultRooms: Room[] = [
   { id: 'open-1', name: 'Główny Pokój', type: 'open-limit', minBet: 1, maxBet: 10000, playersCount: 0 },
   { id: 'open-2', name: 'High Roller', type: 'open-limit', minBet: 100, maxBet: 50000, playersCount: 0 },
@@ -28,6 +35,7 @@ const App: React.FC = () => {
   const [currentGame, setCurrentGame] = useState<'grand-wager' | 'test-gra'>('grand-wager');
   const [selectedRoom, setSelectedRoom] = useState('open-1');
   const [rooms, setRooms] = useState<Room[]>(defaultRooms);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   const [gameState, setGameState] = useState<GameState>({
     currentRound: null,
@@ -38,10 +46,9 @@ const App: React.FC = () => {
   
   const [betAmount, setBetAmount] = useState<string>('10');
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
-  const [winner, setWinner] = useState<{ username: string; amount: number } | null>(null);
+  const [winner, setWinner] = useState<{ playerId: string; username: string; amount: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Handle incoming WebSocket messages
   useEffect(() => {
     if (!lastMessage) return;
 
@@ -61,7 +68,6 @@ const App: React.FC = () => {
             setPlayer(currentPlayer);
           }
         }
-        // Update room player counts
         setRooms(prev => prev.map(room => ({
           ...room,
           playersCount: lastMessage.payload.players?.length || 0,
@@ -93,16 +99,10 @@ const App: React.FC = () => {
 
       case 'ROUND_END':
         setWinner({
+          playerId: lastMessage.payload.winner.playerId,
           username: lastMessage.payload.winner.username,
           amount: lastMessage.payload.winner.amountWon,
         });
-        setTimeout(() => {
-          sendMessage({
-            type: 'SYNC_STATE',
-            payload: {},
-            timestamp: Date.now(),
-          });
-        }, 1000);
         break;
 
       case 'PLAYER_JOINED':
@@ -122,7 +122,6 @@ const App: React.FC = () => {
     }
   }, [lastMessage, player, sendMessage, gameState.playerId]);
 
-  // Timer countdown
   useEffect(() => {
     if (!gameState.currentRound || gameState.currentRound.status === 'finished') {
       return;
@@ -157,7 +156,6 @@ const App: React.FC = () => {
       players: [],
       playerId: null,
     });
-    // Reload to reset WebSocket connection
     window.location.reload();
   };
 
@@ -184,87 +182,69 @@ const App: React.FC = () => {
     }
   };
 
-  const handleQuickBet = (amount: number) => {
-    setBetAmount(amount.toString());
-  };
-
-  const handleGameChange = (game: 'grand-wager' | 'test-gra') => {
-    setCurrentGame(game);
-  };
-
-  const handleAvatarChange = () => {
-    // TODO: Implementacja zmiany avatara
-    alert('Funkcja zmiany avatara będzie dostępna wkrótce!');
-  };
-
-  // Login screen
   if (!isLoggedIn) {
     return <LoginScreen isConnected={isConnected} onLogin={handleLogin} />;
   }
 
-  // Main game layout
   return (
-    <div className="app-layout">
+    <AppWrapper>
       <Navbar
-        casinoName="🎰 ROYAL CASINO"
         balance={player?.balance || 1000}
         username={player?.username || 'Gracz'}
-        currentGame={currentGame}
-        onGameChange={handleGameChange}
+        onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         onLogout={handleLogout}
-        onAvatarChange={handleAvatarChange}
       />
 
-      <div className="main-content">
-        {currentGame === 'grand-wager' && (
-          <Sidebar
-            rooms={rooms}
-            selectedRoomId={selectedRoom}
-            onRoomSelect={setSelectedRoom}
-          />
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        rooms={rooms}
+        selectedRoomId={selectedRoom}
+        onRoomSelect={setSelectedRoom}
+        currentGame={currentGame}
+        onGameChange={setCurrentGame}
+      />
+
+      <MainContent>
+        {error && (
+          <ErrorToast>
+            {error}
+          </ErrorToast>
         )}
 
-        <main className="game-area">
-          {error && (
-            <div className="error-toast">
-              <span>⚠️</span>
-              {error}
-            </div>
-          )}
+        {currentGame === 'grand-wager' ? (
+          <GrandWager
+            player={player}
+            currentRound={gameState.currentRound}
+            config={gameState.config}
+            timeRemaining={timeRemaining}
+            betAmount={betAmount}
+            onBetAmountChange={setBetAmount}
+            onPlaceBet={handlePlaceBet}
+            winner={winner}
+            onWinnerShown={() => {
+              // Po pokazaniu zwycięzcy, odśwież stan i wyczyść winner
+              setTimeout(() => {
+                setWinner(null);
+                sendMessage({
+                  type: 'SYNC_STATE',
+                  payload: {},
+                  timestamp: Date.now(),
+                });
+              }, 3000);
+            }}
+          />
+        ) : (
+          <TestGraPlaceholder>
+            <PlaceholderIcon>?</PlaceholderIcon>
+            <PlaceholderTitle>TEST_GRA</PlaceholderTitle>
+            <PlaceholderText>Ta gra jest jeszcze w przygotowaniu...</PlaceholderText>
+          </TestGraPlaceholder>
+        )}
+      </MainContent>
 
-          {currentGame === 'grand-wager' ? (
-            <GrandWager
-              player={player}
-              currentRound={gameState.currentRound}
-              config={gameState.config}
-              timeRemaining={timeRemaining}
-              betAmount={betAmount}
-              onBetAmountChange={setBetAmount}
-              onPlaceBet={handlePlaceBet}
-              onQuickBet={handleQuickBet}
-            />
-          ) : (
-            <NotFound
-              gameName="TEST_GRA"
-              onGoBack={() => setCurrentGame('grand-wager')}
-            />
-          )}
-        </main>
-      </div>
-
-      {winner && (
-        <WinnerModal
-          username={winner.username}
-          amount={winner.amount}
-          isCurrentPlayer={winner.username === player?.username}
-          onClose={() => setWinner(null)}
-        />
-      )}
-
-      <div className={`connection-status-indicator ${isConnected ? 'online' : 'offline'}`}>
-        <span className="status-dot"></span>
-      </div>
-    </div>
+      <ConnectionDot $online={isConnected} />
+    </AppWrapper>
   );
 };
 

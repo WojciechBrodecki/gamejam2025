@@ -5,12 +5,14 @@
   "main": "dist/bundle.js",
   "scripts": {
     "build": "webpack --mode production",
-    "dev": "webpack serve --mode development --open",
-    "start": "serve -s dist -l 3000"
+    "dev": "webpack serve --mode development --open --port 5000",
+    "start": "serve -s dist -l 5000"
   },
   "dependencies": {
+    "@types/styled-components": "^5.1.36",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "styled-components": "^6.1.19"
   },
   "devDependencies": {
     "@types/react": "^18.2.45",
