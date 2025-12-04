@@ -193,4 +193,37 @@ router.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Get player avatar as image
+router.get('/players/:id/avatar', async (req: Request, res: Response) => {
+  try {
+    const player = await gameService.getPlayer(req.params.id);
+    
+    if (!player) {
+      return res.status(404).json({ success: false, message: 'Player not found' });
+    }
+    
+    if (!player.avatar) {
+      return res.status(404).json({ success: false, message: 'Avatar not found' });
+    }
+
+    // Parse base64 data URL: data:image/jpeg;base64,/9j/4AAQ...
+    const matches = player.avatar.match(/^data:([^;]+);base64,(.+)$/);
+    
+    if (!matches) {
+      return res.status(500).json({ success: false, message: 'Invalid avatar format' });
+    }
+
+    const mimeType = matches[1];
+    const base64Data = matches[2];
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24h
+    res.send(imageBuffer);
+  } catch (error) {
+    console.error('Avatar fetch error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 export default router;
