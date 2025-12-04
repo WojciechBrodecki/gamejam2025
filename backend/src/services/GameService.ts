@@ -221,8 +221,12 @@ export class GameService {
 
       // Credit winner
       const winnerPlayer = await Player.findOne({ id: winner.playerId });
+      let balanceBefore = 0;
+      let balanceAfter = 0;
       if (winnerPlayer) {
+        balanceBefore = winnerPlayer.balance;
         winnerPlayer.balance += winnerAmount;
+        balanceAfter = winnerPlayer.balance;
         await winnerPlayer.save();
       }
 
@@ -241,7 +245,14 @@ export class GameService {
         timestamp: Date.now(),
       });
 
-      console.log(`Round ended. Winner: ${winner.playerUsername} - Won: ${winnerAmount} - Winning number: ${winner.winningNumber}`);
+      console.log(`\n🎉 ========== WINNER ==========`);
+      console.log(`🏆 Player: ${winner.playerUsername}`);
+      console.log(`💰 Won: ${winnerAmount}`);
+      console.log(`💵 Balance before: ${balanceBefore}`);
+      console.log(`💵 Balance after: ${balanceAfter}`);
+      console.log(`🎲 Winning number: ${winner.winningNumber}`);
+      console.log(`📊 Total pool: ${this.currentRound.totalPool}`);
+      console.log(`==============================\n`);
     } else {
       console.log('Round ended with no bets');
     }

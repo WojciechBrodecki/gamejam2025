@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
+import sharp from 'sharp';
 import { gameService } from '../services';
 import { config } from '../config';
 
@@ -22,6 +23,25 @@ const upload = multer({
 // Map to store nickname -> token (persists in memory, resets on server restart)
 const nicknameTokens = new Map<string, string>();
 
+// Resize image so the longer side is 320px, maintaining aspect ratio
+async function resizeAvatar(buffer: Buffer): Promise<Buffer> {
+  const image = sharp(buffer);
+  const metadata = await image.metadata();
+  
+  const width = metadata.width || 320;
+  const height = metadata.height || 320;
+  const maxSize = 320;
+
+  // Determine which dimension to constrain
+  if (width >= height) {
+    // Width is longer, resize by width
+    return image.resize(maxSize, null, { fit: 'inside' }).jpeg({ quality: 85 }).toBuffer();
+  } else {
+    // Height is longer, resize by height
+    return image.resize(null, maxSize, { fit: 'inside' }).jpeg({ quality: 85 }).toBuffer();
+  }
+}
+
 // Login endpoint - creates JWT token for a nickname (returns existing token if nickname exists)
 // POST with optional avatar image (form-data: nickname, avatar)
 router.post('/login/:nickname', upload.single('avatar'), async (req: Request, res: Response) => {
@@ -36,10 +56,11 @@ router.post('/login/:nickname', upload.single('avatar'), async (req: Request, re
     const trimmedNickname = nickname.trim();
     const nicknameLower = trimmedNickname.toLowerCase();
 
-    // Convert avatar to base64 if provided
+    // Resize and convert avatar to base64 if provided
     let avatarBase64: string | undefined;
     if (avatarFile) {
-      avatarBase64 = `data:${avatarFile.mimetype};base64,${avatarFile.buffer.toString('base64')}`;
+      const resizedBuffer = await resizeAvatar(avatarFile.buffer);
+      avatarBase64 = `data:image/jpeg;base64,${resizedBuffer.toString('base64')}`;
     }
 
     // Check if nickname already has a token

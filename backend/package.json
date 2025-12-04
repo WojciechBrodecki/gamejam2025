@@ -16,6 +16,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.0.3",
     "multer": "^2.0.2",
+    "sharp": "^0.34.5",
     "uuid": "^9.0.1",
     "ws": "^8.14.2"
   },
@@ -25,6 +26,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.0.0",
     "@types/node": "^20.10.4",
+    "@types/sharp": "^0.31.1",
     "@types/uuid": "^9.0.7",
     "@types/ws": "^8.5.10",
     "ts-loader": "^9.5.1",
