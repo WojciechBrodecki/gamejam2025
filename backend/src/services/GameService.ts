@@ -293,10 +293,10 @@ export class GameService {
     await this.currentRound.save();
     this.currentRound = null;
 
-    // Create new waiting round after short delay
+    // Create new waiting round after configured delay
     setTimeout(() => {
       this.createWaitingRound();
-    }, 5000);
+    }, config.roundDelayMs);
   }
 
   private selectWinner(bets: { playerId: string; playerUsername: string; amount: number }[]): { playerId: string; playerUsername: string; winningNumber: number } {
@@ -344,12 +344,13 @@ export class GameService {
     };
   }
 
-  async createPlayer(username: string, avatar?: string): Promise<IPlayer> {
+  async createPlayer(username: string, avatar?: string, token?: string): Promise<IPlayer> {
     const player = new Player({
       id: uuidv4(),
       username,
       balance: 1000, // Starting balance
       avatar: avatar || null,
+      token: token || null,
     });
     await player.save();
     return player;
@@ -367,6 +368,14 @@ export class GameService {
     return Player.findOneAndUpdate(
       { username },
       { avatar },
+      { new: true }
+    );
+  }
+
+  async updatePlayerToken(username: string, token: string): Promise<IPlayer | null> {
+    return Player.findOneAndUpdate(
+      { username },
+      { token },
       { new: true }
     );
   }

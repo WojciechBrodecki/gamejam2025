@@ -5,6 +5,7 @@ export interface IPlayer extends Document {
   username: string;
   balance: number;
   avatar?: string; // Base64 encoded image (320x320)
+  token?: string; // JWT token
   createdAt: Date;
 }
 
@@ -13,6 +14,7 @@ const PlayerSchema: Schema = new Schema({
   username: { type: String, required: true, unique: true },
   balance: { type: Number, default: 1000 },
   avatar: { type: String, default: null },
+  token: { type: String, default: null },
   createdAt: { type: Date, default: Date.now },
 });
 

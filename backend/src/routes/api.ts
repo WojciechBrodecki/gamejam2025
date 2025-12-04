@@ -20,9 +20,6 @@ const upload = multer({
   },
 });
 
-// Map to store nickname -> token (persists in memory, resets on server restart)
-const nicknameTokens = new Map<string, string>();
-
 // Resize image so the longer side is 320px, maintaining aspect ratio
 async function resizeAvatar(buffer: Buffer): Promise<Buffer> {
   const image = sharp(buffer);
@@ -54,7 +51,6 @@ router.post('/login/:nickname', upload.single('avatar'), async (req: Request, re
     }
 
     const trimmedNickname = nickname.trim();
-    const nicknameLower = trimmedNickname.toLowerCase();
 
     // Resize and convert avatar to base64 if provided
     let avatarBase64: string | undefined;
@@ -63,41 +59,18 @@ router.post('/login/:nickname', upload.single('avatar'), async (req: Request, re
       avatarBase64 = `data:image/jpeg;base64,${resizedBuffer.toString('base64')}`;
     }
 
-    // Check if nickname already has a token
-    const existingToken = nicknameTokens.get(nicknameLower);
-    if (existingToken) {
-      // Update avatar if provided
-      if (avatarBase64) {
-        await gameService.updatePlayerAvatar(trimmedNickname, avatarBase64);
-      }
-      
-      const player = await gameService.getPlayerByUsername(trimmedNickname);
-      return res.json({
-        success: true,
-        token: existingToken,
-        nickname: trimmedNickname,
-        avatar: player?.avatar || null,
-      });
-    }
-
-    // Check if player with this username already exists in database - generate new token for them
+    // Check if player already exists in database
     const existingPlayer = await gameService.getPlayerByUsername(trimmedNickname);
+    
     if (existingPlayer) {
       // Update avatar if provided
       if (avatarBase64) {
         await gameService.updatePlayerAvatar(trimmedNickname, avatarBase64);
       }
-      
-      const token = jwt.sign(
-        { nickname: existingPlayer.username },
-        config.jwtSecret,
-        { expiresIn: '24h' }
-      );
-      nicknameTokens.set(nicknameLower, token);
-      
+
       return res.json({
         success: true,
-        token,
+        token: existingPlayer.token,
         nickname: existingPlayer.username,
         avatar: avatarBase64 || existingPlayer.avatar || null,
       });
@@ -110,8 +83,8 @@ router.post('/login/:nickname', upload.single('avatar'), async (req: Request, re
       { expiresIn: '24h' }
     );
 
-    // Store token for this nickname
-    nicknameTokens.set(nicknameLower, token);
+    // Create new player with token (single DB operation)
+    await gameService.createPlayer(trimmedNickname, avatarBase64, token);
 
     res.json({
       success: true,
