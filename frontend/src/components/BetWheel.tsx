@@ -24,18 +24,19 @@ import {
   PlayerPercent,
 } from '../styles/BetWheel.styles';
 
-// Kolory dla graczy
-const PLAYER_COLORS = [
-  '#f0c020', // gold
-  '#4080e0', // blue
-  '#40c080', // green
-  '#e05050', // red
-  '#a040c0', // purple
-  '#40c0c0', // cyan
-  '#e08040', // orange
-  '#c040a0', // pink
-  '#80c040', // lime
-  '#c0c040', // yellow-green
+// Kolor dla zalogowanego gracza
+const CURRENT_PLAYER_COLOR = '#f0c020'; // gold
+
+// Odcienie szarości dla innych graczy
+const OTHER_PLAYER_COLORS = [
+  '#8a8a9a', // jasny szary
+  '#6a6a7a', // średni szary
+  '#5a5a6a', // ciemniejszy szary
+  '#7a7a8a', // szary niebieski
+  '#9a9aaa', // bardzo jasny szary
+  '#4a4a5a', // ciemny szary
+  '#aaaaба', // srebrzysty
+  '#606070', // stalowy
 ];
 
 interface Bet {
@@ -97,16 +98,22 @@ const BetWheel: React.FC<BetWheelProps> = ({
 
   const aggregatedBets = useMemo(() => {
     const byPlayer: Record<string, AggregatedBet> = {};
+    let otherColorIndex = 0;
     
     activeBets.forEach((bet) => {
       if (!byPlayer[bet.playerId]) {
-        const colorIndex = Object.keys(byPlayer).length % PLAYER_COLORS.length;
+        // Zalogowany gracz ma złoty kolor, reszta odcienie szarości
+        const isCurrentPlayer = bet.playerId === currentPlayerId;
+        const color = isCurrentPlayer 
+          ? CURRENT_PLAYER_COLOR 
+          : OTHER_PLAYER_COLORS[otherColorIndex++ % OTHER_PLAYER_COLORS.length];
+        
         byPlayer[bet.playerId] = {
           playerId: bet.playerId,
           username: bet.playerUsername,
           totalAmount: 0,
           percent: 0,
-          color: PLAYER_COLORS[colorIndex],
+          color,
         };
       }
       byPlayer[bet.playerId].totalAmount += bet.amount;
@@ -117,7 +124,7 @@ const BetWheel: React.FC<BetWheelProps> = ({
     });
 
     return Object.values(byPlayer).sort((a, b) => b.totalAmount - a.totalAmount);
-  }, [activeBets, activePool]);
+  }, [activeBets, activePool, currentPlayerId]);
 
   // Główna logika animacji - reaguj na nowego winnera
   useEffect(() => {
@@ -147,15 +154,19 @@ const BetWheel: React.FC<BetWheelProps> = ({
 
     // Oblicz dane o zwycięzcy
     const byPlayer: Record<string, AggregatedBet> = {};
+    let otherColorIdx = 0;
     bets.forEach((bet) => {
       if (!byPlayer[bet.playerId]) {
-        const colorIndex = Object.keys(byPlayer).length % PLAYER_COLORS.length;
+        const isCurrentPlayer = bet.playerId === currentPlayerId;
+        const color = isCurrentPlayer 
+          ? CURRENT_PLAYER_COLOR 
+          : OTHER_PLAYER_COLORS[otherColorIdx++ % OTHER_PLAYER_COLORS.length];
         byPlayer[bet.playerId] = {
           playerId: bet.playerId,
           username: bet.playerUsername,
           totalAmount: 0,
           percent: 0,
-          color: PLAYER_COLORS[colorIndex],
+          color,
         };
       }
       byPlayer[bet.playerId].totalAmount += bet.amount;
@@ -174,7 +185,7 @@ const BetWheel: React.FC<BetWheelProps> = ({
       // Fallback
       setWinnerData({
         chance: 0,
-        color: PLAYER_COLORS[0],
+        color: OTHER_PLAYER_COLORS[0],
       });
     }
 
