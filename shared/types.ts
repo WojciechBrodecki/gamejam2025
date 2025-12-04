@@ -16,15 +16,42 @@ export interface Bet {
 
 export interface Round {
   id: string;
-  startTime: Date;
-  endTime: Date;
+  startTime: Date | null;
+  endTime: Date | null;
   bets: Bet[];
   totalPool: number;
   winnerId?: string;
   winnerUsername?: string;
   winnerAmount?: number;
   casinoCommission?: number;
-  status: 'active' | 'finished';
+  status: 'waiting' | 'active' | 'finished';
+}
+
+export type RoomType = 'public' | 'private';
+export type RoomStatus = 'waiting' | 'active' | 'closed';
+
+export interface Room {
+  id: string;
+  name: string;
+  maxPlayers: number;
+  minBet: number;
+  maxBet: number;
+  type: RoomType;
+  inviteCode?: string;
+  playerCount: number;
+  status: RoomStatus;
+  createdAt: Date;
+}
+
+export interface RoomConfig {
+  roomId: string;
+  roomName: string;
+  roundDurationMs: number;
+  casinoCommissionPercent: number;
+  minBet: number;
+  maxBet: number;
+  maxPlayers: number;
+  type: RoomType;
 }
 
 export interface GameConfig {
@@ -37,15 +64,30 @@ export interface GameConfig {
 // WebSocket message types
 export type WSMessageType = 
   | 'ROUND_UPDATE'
+  | 'ROUND_WAITING'
   | 'BET_PLACED'
   | 'ROUND_END'
   | 'ROUND_START'
   | 'PLAYER_JOINED'
   | 'PLAYER_LEFT'
+  | 'PLAYER_JOINED_ROOM'
+  | 'PLAYER_LEFT_ROOM'
   | 'ERROR'
   | 'PLACE_BET'
   | 'JOIN_GAME'
-  | 'SYNC_STATE';
+  | 'JOIN_ROOM'
+  | 'JOIN_ROOM_BY_CODE'
+  | 'LEAVE_ROOM'
+  | 'CREATE_ROOM'
+  | 'ROOM_CREATED'
+  | 'ROOM_JOINED'
+  | 'ROOM_LEFT'
+  | 'ROOM_CLOSED'
+  | 'ROOM_LIST_UPDATE'
+  | 'ROOMS_LIST'
+  | 'GET_ROOMS'
+  | 'SYNC_STATE'
+  | 'CONNECTED';
 
 export interface WSMessage<T = any> {
   type: WSMessageType;
@@ -53,39 +95,114 @@ export interface WSMessage<T = any> {
   timestamp: number;
 }
 
+// Room-related payloads
+export interface CreateRoomPayload {
+  name: string;
+  maxPlayers: number;
+  minBet: number;
+  maxBet: number;
+  type: RoomType;
+}
+
+export interface JoinRoomPayload {
+  roomId: string;
+}
+
+export interface JoinRoomByCodePayload {
+  inviteCode: string;
+}
+
+export interface RoomCreatedPayload {
+  room: Room;
+  currentRound: Round | null;
+  config: RoomConfig;
+}
+
+export interface RoomJoinedPayload {
+  room: Room;
+  currentRound: Round | null;
+  config: RoomConfig;
+  playerId: string;
+}
+
+export interface PlayerJoinedRoomPayload {
+  roomId: string;
+  playerId: string;
+  username: string;
+  playerCount: number;
+}
+
+export interface PlayerLeftRoomPayload {
+  roomId: string;
+  playerId: string;
+  username: string;
+  playerCount: number;
+}
+
+export interface RoomClosedPayload {
+  roomId: string;
+  message: string;
+}
+
+export interface RoomsListPayload {
+  rooms: Room[];
+}
+
+// Round-related payloads
 export interface RoundUpdatePayload {
+  roomId: string;
   round: Round;
   timeRemaining: number;
+  players?: { id: string; username: string; avatar: string | null; totalBet: number }[];
+}
+
+export interface RoundWaitingPayload {
+  roomId: string;
+  round: Round;
+  message: string;
 }
 
 export interface BetPlacedPayload {
+  roomId: string;
   bet: Bet;
   round: Round;
 }
 
 export interface RoundEndPayload {
+  roomId: string;
   round: Round;
   winner: {
     playerId: string;
     username: string;
     amountWon: number;
   };
+  winningNumber: number;
 }
 
 export interface PlaceBetPayload {
   amount: number;
-  playerId: string;
 }
 
 export interface JoinGamePayload {
-  playerId: string;
+  playerId?: string;
   username: string;
 }
 
 export interface SyncStatePayload {
-  currentRound: Round | null;
-  config: GameConfig;
-  players: Player[];
+  globalConfig: GameConfig;
+  playerId?: string;
+  currentRoom: {
+    room: Room;
+    currentRound: Round | null;
+    config: RoomConfig;
+  } | null;
+  availableRooms: Room[];
+}
+
+export interface ConnectedPayload {
+  message: string;
+  username: string;
+  rooms: Room[];
 }
 
 export interface ErrorPayload {

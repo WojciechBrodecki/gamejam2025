@@ -4,7 +4,7 @@ import { createServer } from 'http';
 import mongoose from 'mongoose';
 import { config } from './config';
 import { apiRoutes } from './routes';
-import { WebSocketService, gameService } from './services';
+import { WebSocketService, gameService, roomService } from './services';
 
 const app = express();
 const server = createServer(app);
@@ -35,9 +35,10 @@ async function start(): Promise<void> {
       // Initialize WebSocket after server is listening
       const wsService = new WebSocketService(server);
       gameService.setWebSocketService(wsService);
+      roomService.setWebSocketService(wsService);
       
-      // Create waiting round (will start when 2 players bet)
-      gameService.createWaitingRound();
+      console.log('Room-based game system initialized');
+      console.log('Players can create/join rooms to play separate rounds');
     });
   } catch (error) {
     console.error('Failed to start server:', error);

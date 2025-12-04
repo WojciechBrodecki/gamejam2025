@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import sharp from 'sharp';
-import { gameService } from '../services';
+import { gameService, roomService } from '../services';
 import { config } from '../config';
 
 const router = Router();
@@ -98,15 +98,37 @@ router.post('/login/:nickname', upload.single('avatar'), async (req: Request, re
   }
 });
 
-// Get current game state
-router.get('/game/state', async (req: Request, res: Response) => {
+// ==================== Room Endpoints ====================
+
+// Get list of public rooms
+router.get('/rooms', async (req: Request, res: Response) => {
   try {
-    const currentRound = gameService.getCurrentRound();
-    const config = gameService.getConfig();
+    const rooms = await roomService.getPublicRooms();
+    res.json({
+      success: true,
+      data: rooms.map(r => roomService.formatRoom(r)),
+    });
+  } catch (error) {
+    console.error('Get rooms error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// Get specific room info
+router.get('/rooms/:roomId', async (req: Request, res: Response) => {
+  try {
+    const room = await roomService.getRoom(req.params.roomId);
+    
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Room not found' });
+    }
+
+    const currentRound = roomService.getCurrentRound(room.id);
     
     res.json({
       success: true,
       data: {
+        room: roomService.formatRoom(room),
         currentRound: currentRound ? {
           id: currentRound.id,
           startTime: currentRound.startTime,
@@ -115,13 +137,191 @@ router.get('/game/state', async (req: Request, res: Response) => {
           totalPool: currentRound.totalPool,
           status: currentRound.status,
         } : null,
-        config,
+        config: roomService.getRoomConfig(room),
       },
     });
   } catch (error) {
+    console.error('Get room error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
+// Create a new room
+router.post('/rooms', async (req: Request, res: Response) => {
+  try {
+    const { name, maxPlayers, minBet, maxBet, type, creatorId } = req.body;
+
+    if (!name || !maxPlayers || !minBet || !maxBet || !type || !creatorId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing required fields: name, maxPlayers, minBet, maxBet, type, creatorId' 
+      });
+    }
+
+    if (maxPlayers < 2 || maxPlayers > 100) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'maxPlayers must be between 2 and 100' 
+      });
+    }
+
+    if (minBet < 1 || minBet > maxBet) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'minBet must be at least 1 and less than or equal to maxBet' 
+      });
+    }
+
+    if (!['public', 'private'].includes(type)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'type must be either "public" or "private"' 
+      });
+    }
+
+    const room = await roomService.createRoom({
+      name,
+      maxPlayers,
+      minBet,
+      maxBet,
+      type,
+      creatorId,
+    });
+
+    res.status(201).json({
+      success: true,
+      data: roomService.formatRoom(room),
+    });
+  } catch (error) {
+    console.error('Create room error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// Join a room by ID
+router.post('/rooms/:roomId/join', async (req: Request, res: Response) => {
+  try {
+    const { roomId } = req.params;
+    const { playerId } = req.body;
+
+    if (!playerId) {
+      return res.status(400).json({ success: false, message: 'playerId is required' });
+    }
+
+    const result = await roomService.joinRoom(roomId, playerId);
+    
+    if (!result.success) {
+      return res.status(400).json({ success: false, message: result.message });
+    }
+
+    const currentRound = roomService.getCurrentRound(roomId);
+
+    res.json({
+      success: true,
+      data: {
+        room: roomService.formatRoom(result.room!),
+        currentRound: currentRound ? {
+          id: currentRound.id,
+          startTime: currentRound.startTime,
+          endTime: currentRound.endTime,
+          bets: currentRound.bets,
+          totalPool: currentRound.totalPool,
+          status: currentRound.status,
+        } : null,
+        config: roomService.getRoomConfig(result.room!),
+      },
+    });
+  } catch (error) {
+    console.error('Join room error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// Join a room by invite code
+router.post('/rooms/join-by-code', async (req: Request, res: Response) => {
+  try {
+    const { inviteCode, playerId } = req.body;
+
+    if (!inviteCode || !playerId) {
+      return res.status(400).json({ success: false, message: 'inviteCode and playerId are required' });
+    }
+
+    const result = await roomService.joinRoomByInviteCode(inviteCode, playerId);
+    
+    if (!result.success) {
+      return res.status(400).json({ success: false, message: result.message });
+    }
+
+    const currentRound = roomService.getCurrentRound(result.room!.id);
+
+    res.json({
+      success: true,
+      data: {
+        room: roomService.formatRoom(result.room!),
+        currentRound: currentRound ? {
+          id: currentRound.id,
+          startTime: currentRound.startTime,
+          endTime: currentRound.endTime,
+          bets: currentRound.bets,
+          totalPool: currentRound.totalPool,
+          status: currentRound.status,
+        } : null,
+        config: roomService.getRoomConfig(result.room!),
+      },
+    });
+  } catch (error) {
+    console.error('Join room by code error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// Leave a room
+router.post('/rooms/:roomId/leave', async (req: Request, res: Response) => {
+  try {
+    const { roomId } = req.params;
+    const { playerId } = req.body;
+
+    if (!playerId) {
+      return res.status(400).json({ success: false, message: 'playerId is required' });
+    }
+
+    const result = await roomService.leaveRoom(roomId, playerId);
+    
+    if (!result.success) {
+      return res.status(400).json({ success: false, message: result.message });
+    }
+
+    res.json({ success: true, message: result.message });
+  } catch (error) {
+    console.error('Leave room error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// Close a room (creator only)
+router.post('/rooms/:roomId/close', async (req: Request, res: Response) => {
+  try {
+    const { roomId } = req.params;
+    const { requesterId } = req.body;
+
+    if (!requesterId) {
+      return res.status(400).json({ success: false, message: 'requesterId is required' });
+    }
+
+    const result = await roomService.closeRoom(roomId, requesterId);
+    
+    if (!result.success) {
+      return res.status(400).json({ success: false, message: result.message });
+    }
+
+    res.json({ success: true, message: result.message });
+  } catch (error) {
+    console.error('Close room error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// ==================== Existing Endpoints ====================
 
 // Get player info
 router.get('/player/:id', async (req: Request, res: Response) => {
@@ -218,6 +418,14 @@ router.get('/players/:id/avatar', async (req: Request, res: Response) => {
     console.error('Avatar fetch error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
+});
+
+// Get global game config
+router.get('/config', (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    data: gameService.getConfig(),
+  });
 });
 
 export default router;

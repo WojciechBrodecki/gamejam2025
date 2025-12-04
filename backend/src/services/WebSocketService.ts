@@ -3,6 +3,7 @@ import { Server, IncomingMessage } from 'http';
 import { Socket } from 'net';
 import jwt from 'jsonwebtoken';
 import { gameService } from './GameService';
+import { roomService } from './RoomService';
 import { config } from '../config';
 
 interface JwtPayload {
@@ -14,12 +15,15 @@ interface JwtPayload {
 interface ExtendedWebSocket extends WebSocket {
   playerId?: string;
   playerUsername?: string;
+  roomId?: string;
   isAlive?: boolean;
 }
 
 export class WebSocketService {
   private wss: WebSocketServer;
   private clients: Set<ExtendedWebSocket> = new Set();
+  // Map of roomId -> Set of WebSocket clients in that room
+  private roomClients: Map<string, Set<ExtendedWebSocket>> = new Map();
 
   constructor(server: Server) {
     // Use noServer mode for manual upgrade handling
@@ -94,36 +98,28 @@ export class WebSocketService {
 
       ws.on('close', (code, reason) => {
         console.log(`WebSocket connection closed. Code: ${code}, Reason: ${reason.toString()}`);
-        this.clients.delete(ws);
+        this.handleDisconnect(ws);
       });
 
       ws.on('error', (error: Error & { code?: string }) => {
         // Ignore common WebSocket errors from invalid connections
         const ignoredCodes = ['WS_ERR_INVALID_CLOSE_CODE', 'WS_ERR_INVALID_UTF8', 'ECONNRESET'];
         if (error.code && ignoredCodes.includes(error.code)) {
-          // Silently ignore these errors - they're from invalid HTTP connections
-          this.clients.delete(ws);
+          this.handleDisconnect(ws);
           return;
         }
         console.error('WebSocket error:', error.message);
-        this.clients.delete(ws);
+        this.handleDisconnect(ws);
       });
       
-      // Send a welcome message to confirm connection is stable
-      const currentRound = gameService.getCurrentRound();
+      // Send a welcome message with available rooms
+      const publicRooms = await roomService.getPublicRooms();
       this.sendToClient(ws, {
         type: 'CONNECTED',
         payload: { 
           message: 'WebSocket connection established', 
           username: nickname,
-          round: currentRound ? {
-            id: currentRound.id,
-            startTime: currentRound.startTime,
-            endTime: currentRound.endTime,
-            totalPool: currentRound.totalPool,
-            bets: currentRound.bets,
-            status: currentRound.status,
-          } : null,
+          rooms: publicRooms.map(r => roomService.formatRoom(r)),
         },
         timestamp: Date.now(),
       });
@@ -133,13 +129,29 @@ export class WebSocketService {
     setInterval(() => {
       this.clients.forEach((ws) => {
         if (ws.isAlive === false) {
-          this.clients.delete(ws);
+          this.handleDisconnect(ws);
           return ws.terminate();
         }
         ws.isAlive = false;
         ws.ping();
       });
     }, 30000);
+  }
+
+  private handleDisconnect(ws: ExtendedWebSocket): void {
+    // Remove from room if in one
+    if (ws.roomId) {
+      const roomClients = this.roomClients.get(ws.roomId);
+      if (roomClients) {
+        roomClients.delete(ws);
+        if (roomClients.size === 0) {
+          this.roomClients.delete(ws.roomId);
+        }
+      }
+      // Optionally leave the room in database (or keep them for reconnect)
+      // We'll leave them in the room to allow reconnects
+    }
+    this.clients.delete(ws);
   }
 
   private async autoJoinPlayer(ws: ExtendedWebSocket, nickname: string): Promise<void> {
@@ -151,9 +163,6 @@ export class WebSocketService {
 
     ws.playerId = player.id;
     ws.playerUsername = player.username;
-
-    // Send current state to the joining player
-    await this.handleSyncState(ws);
   }
 
   private async handleMessage(ws: ExtendedWebSocket, message: any): Promise<void> {
@@ -161,11 +170,26 @@ export class WebSocketService {
       case 'JOIN_GAME':
         await this.handleJoinGame(ws, message.payload);
         break;
+      case 'JOIN_ROOM':
+        await this.handleJoinRoom(ws, message.payload);
+        break;
+      case 'JOIN_ROOM_BY_CODE':
+        await this.handleJoinRoomByCode(ws, message.payload);
+        break;
+      case 'LEAVE_ROOM':
+        await this.handleLeaveRoom(ws);
+        break;
+      case 'CREATE_ROOM':
+        await this.handleCreateRoom(ws, message.payload);
+        break;
       case 'PLACE_BET':
         await this.handlePlaceBet(ws, message.payload);
         break;
       case 'SYNC_STATE':
         await this.handleSyncState(ws);
+        break;
+      case 'GET_ROOMS':
+        await this.handleGetRooms(ws);
         break;
       default:
         this.sendToClient(ws, {
@@ -198,6 +222,222 @@ export class WebSocketService {
     await this.handleSyncState(ws);
   }
 
+  private async handleCreateRoom(ws: ExtendedWebSocket, payload: {
+    name: string;
+    maxPlayers: number;
+    minBet: number;
+    maxBet: number;
+    type: 'public' | 'private';
+  }): Promise<void> {
+    if (!ws.playerId) {
+      this.sendToClient(ws, {
+        type: 'ERROR',
+        payload: { message: 'You must join the game first', code: 'NOT_JOINED' },
+        timestamp: Date.now(),
+      });
+      return;
+    }
+
+    try {
+      const room = await roomService.createRoom({
+        name: payload.name,
+        maxPlayers: payload.maxPlayers,
+        minBet: payload.minBet,
+        maxBet: payload.maxBet,
+        type: payload.type,
+        creatorId: ws.playerId,
+      });
+
+      // Auto-join the creator to the room's WebSocket channel
+      ws.roomId = room.id;
+      if (!this.roomClients.has(room.id)) {
+        this.roomClients.set(room.id, new Set());
+      }
+      this.roomClients.get(room.id)!.add(ws);
+
+      const currentRound = roomService.getCurrentRound(room.id);
+
+      this.sendToClient(ws, {
+        type: 'ROOM_CREATED',
+        payload: {
+          room: roomService.formatRoom(room),
+          currentRound: currentRound ? {
+            id: currentRound.id,
+            startTime: currentRound.startTime,
+            endTime: currentRound.endTime,
+            totalPool: currentRound.totalPool,
+            bets: currentRound.bets,
+            status: currentRound.status,
+          } : null,
+          config: roomService.getRoomConfig(room),
+        },
+        timestamp: Date.now(),
+      });
+
+      // Broadcast new room to all connected clients
+      this.broadcast({
+        type: 'ROOM_LIST_UPDATE',
+        payload: {
+          rooms: (await roomService.getPublicRooms()).map(r => roomService.formatRoom(r)),
+        },
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error('Create room error:', error);
+      this.sendToClient(ws, {
+        type: 'ERROR',
+        payload: { message: 'Failed to create room', code: 'CREATE_ROOM_FAILED' },
+        timestamp: Date.now(),
+      });
+    }
+  }
+
+  private async handleJoinRoom(ws: ExtendedWebSocket, payload: { roomId: string }): Promise<void> {
+    if (!ws.playerId) {
+      this.sendToClient(ws, {
+        type: 'ERROR',
+        payload: { message: 'You must join the game first', code: 'NOT_JOINED' },
+        timestamp: Date.now(),
+      });
+      return;
+    }
+
+    // Leave current room if in one
+    if (ws.roomId) {
+      await this.handleLeaveRoom(ws, true);
+    }
+
+    const result = await roomService.joinRoom(payload.roomId, ws.playerId);
+
+    if (!result.success) {
+      this.sendToClient(ws, {
+        type: 'ERROR',
+        payload: { message: result.message, code: 'JOIN_ROOM_FAILED' },
+        timestamp: Date.now(),
+      });
+      return;
+    }
+
+    // Add to room's WebSocket channel
+    ws.roomId = payload.roomId;
+    if (!this.roomClients.has(payload.roomId)) {
+      this.roomClients.set(payload.roomId, new Set());
+    }
+    this.roomClients.get(payload.roomId)!.add(ws);
+
+    const room = result.room!;
+    const currentRound = roomService.getCurrentRound(room.id);
+
+    this.sendToClient(ws, {
+      type: 'ROOM_JOINED',
+      payload: {
+        room: roomService.formatRoom(room),
+        currentRound: currentRound ? {
+          id: currentRound.id,
+          startTime: currentRound.startTime,
+          endTime: currentRound.endTime,
+          totalPool: currentRound.totalPool,
+          bets: currentRound.bets,
+          status: currentRound.status,
+        } : null,
+        config: roomService.getRoomConfig(room),
+        playerId: ws.playerId,
+      },
+      timestamp: Date.now(),
+    });
+  }
+
+  private async handleJoinRoomByCode(ws: ExtendedWebSocket, payload: { inviteCode: string }): Promise<void> {
+    if (!ws.playerId) {
+      this.sendToClient(ws, {
+        type: 'ERROR',
+        payload: { message: 'You must join the game first', code: 'NOT_JOINED' },
+        timestamp: Date.now(),
+      });
+      return;
+    }
+
+    // Leave current room if in one
+    if (ws.roomId) {
+      await this.handleLeaveRoom(ws, true);
+    }
+
+    const result = await roomService.joinRoomByInviteCode(payload.inviteCode, ws.playerId);
+
+    if (!result.success) {
+      this.sendToClient(ws, {
+        type: 'ERROR',
+        payload: { message: result.message, code: 'JOIN_ROOM_FAILED' },
+        timestamp: Date.now(),
+      });
+      return;
+    }
+
+    const room = result.room!;
+
+    // Add to room's WebSocket channel
+    ws.roomId = room.id;
+    if (!this.roomClients.has(room.id)) {
+      this.roomClients.set(room.id, new Set());
+    }
+    this.roomClients.get(room.id)!.add(ws);
+
+    const currentRound = roomService.getCurrentRound(room.id);
+
+    this.sendToClient(ws, {
+      type: 'ROOM_JOINED',
+      payload: {
+        room: roomService.formatRoom(room),
+        currentRound: currentRound ? {
+          id: currentRound.id,
+          startTime: currentRound.startTime,
+          endTime: currentRound.endTime,
+          totalPool: currentRound.totalPool,
+          bets: currentRound.bets,
+          status: currentRound.status,
+        } : null,
+        config: roomService.getRoomConfig(room),
+        playerId: ws.playerId,
+      },
+      timestamp: Date.now(),
+    });
+  }
+
+  private async handleLeaveRoom(ws: ExtendedWebSocket, silent: boolean = false): Promise<void> {
+    if (!ws.roomId || !ws.playerId) {
+      if (!silent) {
+        this.sendToClient(ws, {
+          type: 'ERROR',
+          payload: { message: 'Not in a room', code: 'NOT_IN_ROOM' },
+          timestamp: Date.now(),
+        });
+      }
+      return;
+    }
+
+    const roomId = ws.roomId;
+    await roomService.leaveRoom(roomId, ws.playerId);
+
+    // Remove from room's WebSocket channel
+    const roomClients = this.roomClients.get(roomId);
+    if (roomClients) {
+      roomClients.delete(ws);
+      if (roomClients.size === 0) {
+        this.roomClients.delete(roomId);
+      }
+    }
+
+    ws.roomId = undefined;
+
+    if (!silent) {
+      this.sendToClient(ws, {
+        type: 'ROOM_LEFT',
+        payload: { message: 'Left room successfully' },
+        timestamp: Date.now(),
+      });
+    }
+  }
+
   private async handlePlaceBet(ws: ExtendedWebSocket, payload: { amount: number }): Promise<void> {
     if (!ws.playerId) {
       this.sendToClient(ws, {
@@ -208,7 +448,16 @@ export class WebSocketService {
       return;
     }
 
-    const result = await gameService.placeBet(ws.playerId, payload.amount);
+    if (!ws.roomId) {
+      this.sendToClient(ws, {
+        type: 'ERROR',
+        payload: { message: 'You must join a room first', code: 'NOT_IN_ROOM' },
+        timestamp: Date.now(),
+      });
+      return;
+    }
+
+    const result = await roomService.placeBet(ws.roomId, ws.playerId, payload.amount);
     
     if (!result.success) {
       this.sendToClient(ws, {
@@ -220,30 +469,71 @@ export class WebSocketService {
   }
 
   private async handleSyncState(ws: ExtendedWebSocket): Promise<void> {
-    const currentRound = gameService.getCurrentRound();
-    const config = gameService.getConfig();
+    const globalConfig = gameService.getConfig();
+    const publicRooms = await roomService.getPublicRooms();
+
+    let roomData = null;
+    if (ws.roomId) {
+      const room = await roomService.getRoom(ws.roomId);
+      if (room) {
+        const currentRound = roomService.getCurrentRound(room.id);
+        roomData = {
+          room: roomService.formatRoom(room),
+          currentRound: currentRound ? {
+            id: currentRound.id,
+            startTime: currentRound.startTime,
+            endTime: currentRound.endTime,
+            bets: currentRound.bets,
+            totalPool: currentRound.totalPool,
+            status: currentRound.status,
+          } : null,
+          config: roomService.getRoomConfig(room),
+        };
+      }
+    }
 
     this.sendToClient(ws, {
       type: 'SYNC_STATE',
       payload: {
-        currentRound: currentRound ? {
-          id: currentRound.id,
-          startTime: currentRound.startTime,
-          endTime: currentRound.endTime,
-          bets: currentRound.bets,
-          totalPool: currentRound.totalPool,
-          status: currentRound.status,
-        } : null,
-        config,
+        globalConfig,
         playerId: ws.playerId,
+        currentRoom: roomData,
+        availableRooms: publicRooms.map(r => roomService.formatRoom(r)),
       },
       timestamp: Date.now(),
     });
   }
 
+  private async handleGetRooms(ws: ExtendedWebSocket): Promise<void> {
+    const publicRooms = await roomService.getPublicRooms();
+
+    this.sendToClient(ws, {
+      type: 'ROOMS_LIST',
+      payload: {
+        rooms: publicRooms.map(r => roomService.formatRoom(r)),
+      },
+      timestamp: Date.now(),
+    });
+  }
+
+  // Broadcast to all connected clients
   broadcast(message: any): void {
     const data = JSON.stringify(message);
     this.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(data);
+      }
+    });
+  }
+
+  // Broadcast to all clients in a specific room
+  broadcastToRoom(roomId: string, message: any): void {
+    const data = JSON.stringify(message);
+    const roomClients = this.roomClients.get(roomId);
+    
+    if (!roomClients) return;
+
+    roomClients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(data);
       }
