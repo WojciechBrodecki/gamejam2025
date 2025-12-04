@@ -29,14 +29,14 @@ const DEFAULT_ROOMS = [
     minBet: 1,
     maxBet: 100,
     maxPlayers: 20,
-    roundDurationMs: 60 * 1000, // 1 minute
+    roundDurationMs: 10 * 1000, // 1 minute
   },
   {
     name: 'High Stake',
     minBet: 100,
     maxBet: 1000,
     maxPlayers: 20,
-    roundDurationMs: 2 * 60 * 1000, // 2 minutes
+    roundDurationMs: 10 * 1000, // 2 minutes
   },
 ];
 
