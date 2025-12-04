@@ -119,6 +119,7 @@ export class WebSocketService {
         payload: { 
           message: 'WebSocket connection established', 
           username: nickname,
+          playerId: ws.playerId,
           rooms: publicRooms.map(r => roomService.formatRoom(r)),
         },
         timestamp: Date.now(),
