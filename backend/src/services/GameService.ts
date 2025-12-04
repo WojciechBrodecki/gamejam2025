@@ -236,11 +236,12 @@ export class GameService {
             username: winner.playerUsername,
             amountWon: winnerAmount,
           },
+          winningNumber: winner.winningNumber,
         },
         timestamp: Date.now(),
       });
 
-      console.log(`Round ended. Winner: ${winner.playerUsername} - Won: ${winnerAmount}`);
+      console.log(`Round ended. Winner: ${winner.playerUsername} - Won: ${winnerAmount} - Winning number: ${winner.winningNumber}`);
     } else {
       console.log('Round ended with no bets');
     }
@@ -254,21 +255,21 @@ export class GameService {
     }, 5000);
   }
 
-  private selectWinner(bets: { playerId: string; playerUsername: string; amount: number }[]): { playerId: string; playerUsername: string } {
+  private selectWinner(bets: { playerId: string; playerUsername: string; amount: number }[]): { playerId: string; playerUsername: string; winningNumber: number } {
     // Create weighted pool based on bet amounts
     const totalPool = bets.reduce((sum, bet) => sum + bet.amount, 0);
-    const random = Math.random() * totalPool;
+    const winningNumber = Math.random() * totalPool;
     
     let cumulative = 0;
     for (const bet of bets) {
       cumulative += bet.amount;
-      if (random <= cumulative) {
-        return { playerId: bet.playerId, playerUsername: bet.playerUsername };
+      if (winningNumber <= cumulative) {
+        return { playerId: bet.playerId, playerUsername: bet.playerUsername, winningNumber };
       }
     }
 
     // Fallback (should never happen)
-    return { playerId: bets[0].playerId, playerUsername: bets[0].playerUsername };
+    return { playerId: bets[0].playerId, playerUsername: bets[0].playerUsername, winningNumber };
   }
 
   getCurrentRound(): IRound | null {
