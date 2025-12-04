@@ -7,7 +7,6 @@ import {
   Navbar,
   Sidebar,
   GrandWager,
-  NotFound,
   LoginScreen,
   Room,
   TimberFever,
@@ -64,15 +63,10 @@ const App: React.FC = () => {
   // Fetch player data from API when we get playerId
   const fetchPlayerData = async (playerId: string) => {
     try {
-      console.log('fetchPlayerData: Fetching from', `${API_BASE_URL}/api/player/${playerId}`);
       const response = await fetch(`${API_BASE_URL}/api/player/${playerId}`);
       const data = await response.json();
-      console.log('fetchPlayerData: Response', data);
       if (data.success && data.data) {
         setPlayer(data.data);
-        console.log('fetchPlayerData: Player set', data.data);
-      } else {
-        console.error('fetchPlayerData: Invalid response', data);
       }
     } catch (error) {
       console.error('Failed to fetch player data:', error);
@@ -102,7 +96,6 @@ const App: React.FC = () => {
         break;
 
       case 'SYNC_STATE':
-        console.log('SYNC_STATE received:', lastMessage.payload);
         // Pobierz roundStatus z SYNC_STATE
         const syncRoundStatus = lastMessage.payload.currentRound?.status || 'waiting';
         setRoundStatus(syncRoundStatus);
@@ -116,10 +109,7 @@ const App: React.FC = () => {
         
         // Fetch player data from API
         if (lastMessage.payload.playerId) {
-          console.log('Fetching player data for:', lastMessage.payload.playerId);
           fetchPlayerData(lastMessage.payload.playerId);
-        } else {
-          console.warn('No playerId in SYNC_STATE!');
         }
         break;
 
@@ -190,8 +180,6 @@ const App: React.FC = () => {
   }, [gameState.currentRound]);
 
   const handleLogin = async (username: string, avatar?: File) => {
-    console.log('handleLogin called with username:', username, 'avatar:', avatar ? 'yes' : 'no');
-    
     const result = await login(username, avatar);
     
     if (!result.success) {
@@ -216,8 +204,6 @@ const App: React.FC = () => {
   };
 
   const handlePlaceBet = () => {
-    console.log('handlePlaceBet called, isConnected:', isConnected);
-    
     if (!isConnected) {
       toast.error('Brak połączenia z serwerem');
       return;

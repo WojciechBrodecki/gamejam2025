@@ -136,11 +136,8 @@ const BetWheel: React.FC<BetWheelProps> = ({
     
     // Sprawdź czy mamy dane do animacji
     if (bets.length === 0 || totalPool === 0) {
-      console.log('No bets data for animation');
       return;
     }
-
-    console.log('🎰 Starting wheel animation for:', winner.username);
     lastWinnerIdRef.current = winnerId;
 
     // Zamroź dane
@@ -167,15 +164,13 @@ const BetWheel: React.FC<BetWheelProps> = ({
     });
     
     const winnerPlayer = byPlayer[winner.playerId];
-    console.log('🎯 Winner player data:', winnerPlayer, 'from byPlayer:', byPlayer, 'winner.playerId:', winner.playerId);
     if (winnerPlayer) {
       setWinnerData({
         chance: winnerPlayer.percent,
         color: winnerPlayer.color,
       });
     } else {
-      // Fallback - jeśli nie znaleziono gracza w zakładach
-      console.log('⚠️ Winner not found in bets, using fallback');
+      // Fallback
       setWinnerData({
         chance: 0,
         color: PLAYER_COLORS[0],
@@ -199,8 +194,6 @@ const BetWheel: React.FC<BetWheelProps> = ({
     // Dodaj pełne obroty + dodatkową rotację do osiągnięcia celu
     const targetRotation = rotation + (spins * 360) + additionalRotation;
 
-    console.log('Target rotation:', targetRotation, 'Winning angle:', winningAngle, 'Current rotation:', rotation);
-
     // Animacja kręcenia - 1 obrót na sekundę = 5 sekund na 5 obrotów
     const duration = 3000; // 3 sekundy
     const startTime = Date.now();
@@ -222,13 +215,10 @@ const BetWheel: React.FC<BetWheelProps> = ({
         animationRef.current = requestAnimationFrame(animate);
       } else {
         // Animacja zakończona
-        console.log('🎰 Animation finished, showing winner popup');
         setIsSpinning(false);
-        // NIE normalizuj rotation - zostaw końcową pozycję
         
         // Pokaż popup winnera po krótkim opóźnieniu
         setTimeout(() => {
-          console.log('🎰 Setting showWinnerPopup to true');
           setShowWinnerPopup(true);
         }, 500);
       }
@@ -247,7 +237,6 @@ const BetWheel: React.FC<BetWheelProps> = ({
   useEffect(() => {
     if (showWinnerPopup && winner) {
       const timeout = setTimeout(() => {
-        console.log('🏆 Winner shown, calling onWinnerShown');
         setShowWinnerPopup(false);
         setDisplayBets([]);
         setDisplayPool(0);
@@ -354,8 +343,6 @@ const BetWheel: React.FC<BetWheelProps> = ({
         </TimerCenter>
 
         {showWinnerPopup && winner && winnerData && (
-          <>
-          {console.log('🏆 Rendering WinnerOverlay:', { showWinnerPopup, winner, winnerData })}
           <WinnerOverlay>
             <WinnerIcon $color={winnerData.color}>
               <WinnerAvatar 
@@ -376,7 +363,6 @@ const BetWheel: React.FC<BetWheelProps> = ({
               Szansa: <span>{winnerData.chance.toFixed(1)}%</span>
             </WinnerChance>
           </WinnerOverlay>
-          </>
         )}
       </WheelWrapper>
 

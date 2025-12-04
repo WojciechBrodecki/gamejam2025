@@ -1,15 +1,5 @@
 import styled, { keyframes, css } from 'styled-components';
 
-// Animacja kręcenia koła
-const spin = keyframes`
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-`;
-
 // Animacja pulsowania timera
 const timerPulse = keyframes`
   0%, 100% {
@@ -64,7 +54,7 @@ export const WheelPointer = styled.div`
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
 `;
 
-export const WheelSvg = styled.svg<{ $spinning?: boolean }>`
+export const WheelSvg = styled.svg`
   width: 100%;
   height: 100%;
   border-radius: 50%;
