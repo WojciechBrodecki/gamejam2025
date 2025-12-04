@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useWebSocket } from './hooks/useWebSocket';
-import { GameState, Player } from './types';
+import { GameState, Player, Room } from './types';
 import {
   Navbar,
   Sidebar,
   GrandWager,
   LoginScreen,
-  Room,
   TimberFever,
 } from './components';
 import {
@@ -21,22 +20,25 @@ import {
 } from './styles/App.styles';
 import { API_BASE_URL } from './config';
 
-const defaultRooms: Room[] = [
-  { id: 'open-1', name: 'Główny Pokój', type: 'open-limit', minBet: 1, maxBet: 10000, playersCount: 0 },
-  { id: 'open-2', name: 'High Roller', type: 'open-limit', minBet: 100, maxBet: 50000, playersCount: 0 },
-  { id: '1v1-1', name: 'Arena #1', type: '1:1', minBet: 50, playersCount: 0 },
-  { id: '1v1-2', name: 'Arena #2', type: '1:1', minBet: 100, playersCount: 0 },
-];
-
 const App: React.FC = () => {
-  const { isConnected, lastMessage, sendMessage, login, disconnect, tryAutoLogin } = useWebSocket();
+  const { 
+    isConnected, 
+    lastMessage, 
+    sendMessage, 
+    login, 
+    disconnect, 
+    tryAutoLogin,
+    joinRoom,
+    joinRoomByCode,
+    leaveRoom,
+    createRoom,
+    closeRoom,
+  } = useWebSocket();
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAutoLogging, setIsAutoLogging] = useState(true);
   const [player, setPlayer] = useState<Player | null>(null);
   const [currentGame, setCurrentGame] = useState<'grand-wager' | 'timber-fever'>('grand-wager');
-  const [selectedRoom, setSelectedRoom] = useState('open-1');
-  const [rooms, setRooms] = useState<Room[]>(defaultRooms);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
   const [gameState, setGameState] = useState<GameState>({
@@ -44,14 +46,26 @@ const App: React.FC = () => {
     config: null,
     players: [],
     playerId: null,
+    currentRoom: null,
+    availableRooms: [],
   });
   
   const [betAmount, setBetAmount] = useState<string>('10');
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [winner, setWinner] = useState<{ playerId: string; username: string; amount: number; winningNumber: number; avatar?: string | null } | null>(null);
   const [roundStatus, setRoundStatus] = useState<'waiting' | 'active' | 'finished'>('waiting');
+  const [pendingRoomCode, setPendingRoomCode] = useState<string | null>(null);
 
-  // Try auto-login on mount
+  // Check for roomCode in URL on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomCode = urlParams.get('roomCode');
+    if (roomCode) {
+      setPendingRoomCode(roomCode);
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
   useEffect(() => {
     const savedSession = tryAutoLogin();
     if (savedSession) {
@@ -59,6 +73,14 @@ const App: React.FC = () => {
     }
     setIsAutoLogging(false);
   }, [tryAutoLogin]);
+
+  // Join room by code when connected and have pending room code
+  useEffect(() => {
+    if (isConnected && pendingRoomCode && isLoggedIn) {
+      joinRoomByCode(pendingRoomCode);
+      setPendingRoomCode(null);
+    }
+  }, [isConnected, pendingRoomCode, isLoggedIn, joinRoomByCode]);
 
   // Fetch player data from API when we get playerId
   const fetchPlayerData = async (playerId: string) => {
@@ -78,12 +100,82 @@ const App: React.FC = () => {
 
     switch (lastMessage.type) {
       case 'CONNECTED':
-        // Store playerId from CONNECTED (username matches our login)
+        // Store playerId and available rooms from CONNECTED
         if (lastMessage.payload.username) {
           setGameState(prev => ({
             ...prev,
             playerId: lastMessage.payload.playerId || prev.playerId,
+            availableRooms: lastMessage.payload.rooms || [],
           }));
+          // Fetch player data to get balance
+          if (lastMessage.payload.playerId) {
+            fetchPlayerData(lastMessage.payload.playerId);
+          }
+        }
+        break;
+
+      case 'ROOM_JOINED':
+      case 'ROOM_CREATED':
+        // Joined/Created a room - update state with room data
+        setGameState(prev => ({
+          ...prev,
+          currentRoom: lastMessage.payload.room,
+          currentRound: lastMessage.payload.currentRound,
+          config: lastMessage.payload.config,
+          playerId: lastMessage.payload.playerId || prev.playerId,
+        }));
+        if (lastMessage.payload.currentRound) {
+          setRoundStatus(lastMessage.payload.currentRound.status || 'waiting');
+        }
+        // Only show toast for private rooms
+        if (lastMessage.payload.room.type === 'private') {
+          toast.success(`Dołączono do pokoju: ${lastMessage.payload.room.name}`);
+        }
+        break;
+
+      case 'ROOM_LEFT':
+        setGameState(prev => ({
+          ...prev,
+          currentRoom: null,
+          currentRound: null,
+          config: null,
+        }));
+        setRoundStatus('waiting');
+        setWinner(null);
+        toast.info('Opuszczono pokój');
+        break;
+
+      case 'ROOM_CLOSED':
+        setGameState(prev => ({
+          ...prev,
+          currentRoom: null,
+          currentRound: null,
+          config: null,
+        }));
+        setRoundStatus('waiting');
+        setWinner(null);
+        toast.warning('Pokój został zamknięty');
+        break;
+
+      case 'ROOM_LIST_UPDATE':
+      case 'ROOMS_LIST':
+        setGameState(prev => ({
+          ...prev,
+          availableRooms: lastMessage.payload.rooms || [],
+        }));
+        break;
+
+      case 'PLAYER_JOINED_ROOM':
+        // Only show notification for private rooms
+        if (gameState.currentRoom?.type === 'private') {
+          toast.info(`${lastMessage.payload.username} dołączył do pokoju`);
+        }
+        break;
+
+      case 'PLAYER_LEFT_ROOM':
+        // Only show notification for private rooms
+        if (gameState.currentRoom?.type === 'private') {
+          toast.info(`${lastMessage.payload.username} opuścił pokój`);
         }
         break;
 
@@ -96,15 +188,17 @@ const App: React.FC = () => {
         break;
 
       case 'SYNC_STATE':
-        // Pobierz roundStatus z SYNC_STATE
-        const syncRoundStatus = lastMessage.payload.currentRound?.status || 'waiting';
+        // Handle new SYNC_STATE format with rooms
+        const syncRoundStatus = lastMessage.payload.currentRoom?.currentRound?.status || 'waiting';
         setRoundStatus(syncRoundStatus);
         
         setGameState(prev => ({
           ...prev,
-          currentRound: lastMessage.payload.currentRound,
-          config: lastMessage.payload.config,
-          playerId: lastMessage.payload.playerId,
+          currentRoom: lastMessage.payload.currentRoom?.room || null,
+          currentRound: lastMessage.payload.currentRoom?.currentRound || null,
+          config: lastMessage.payload.currentRoom?.config || null,
+          playerId: lastMessage.payload.playerId || prev.playerId,
+          availableRooms: lastMessage.payload.availableRooms || [],
         }));
         
         // Fetch player data from API
@@ -156,6 +250,20 @@ const App: React.FC = () => {
         }
         break;
 
+      case 'ROUND_RESULT_NOTIFICATION':
+        // Personal notification about round result (for players who placed bets)
+        const { isWinner, netResult, roomName, winnerUsername, currentBalance } = lastMessage.payload;
+        if (isWinner) {
+          toast.success(`🏆 Wygrałeś ${netResult}$ w pokoju ${roomName}!`);
+        } else {
+          toast.info(`Pokój ${roomName}: Wygrał ${winnerUsername}. Stracono: ${Math.abs(netResult)}$`);
+        }
+        // Update player balance from notification
+        if (player && currentBalance !== undefined) {
+          setPlayer({ ...player, balance: currentBalance });
+        }
+        break;
+
       case 'ERROR':
         console.error('Server ERROR:', lastMessage.payload);
         toast.error(lastMessage.payload.message);
@@ -164,14 +272,14 @@ const App: React.FC = () => {
   }, [lastMessage, gameState.playerId]);
 
   useEffect(() => {
-    if (!gameState.currentRound || gameState.currentRound.status === 'finished') {
+    if (!gameState.currentRound || gameState.currentRound.status === 'finished' || !gameState.currentRound.endTime) {
       return;
     }
 
     const interval = setInterval(() => {
       const remaining = Math.max(
         0,
-        new Date(gameState.currentRound!.endTime).getTime() - Date.now()
+        new Date(gameState.currentRound!.endTime!).getTime() - Date.now()
       );
       setTimeRemaining(remaining);
     }, 100);
@@ -192,6 +300,9 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
+    if (gameState.currentRoom) {
+      leaveRoom();
+    }
     disconnect();
     setIsLoggedIn(false);
     setPlayer(null);
@@ -200,12 +311,19 @@ const App: React.FC = () => {
       config: null,
       players: [],
       playerId: null,
+      currentRoom: null,
+      availableRooms: [],
     });
   };
 
   const handlePlaceBet = () => {
     if (!isConnected) {
       toast.error('Brak połączenia z serwerem');
+      return;
+    }
+
+    if (!gameState.currentRoom) {
+      toast.error('Najpierw dołącz do pokoju');
       return;
     }
 
@@ -229,6 +347,31 @@ const App: React.FC = () => {
     if (player) {
       setPlayer({ ...player, balance: player.balance - amount });
     }
+  };
+
+  const handleJoinRoom = (roomId: string) => {
+    joinRoom(roomId);
+  };
+
+  const handleJoinRoomByCode = (inviteCode: string) => {
+    joinRoomByCode(inviteCode);
+  };
+
+  const handleLeaveRoom = () => {
+    leaveRoom();
+  };
+
+  const handleCreateRoom = (options: {
+    name: string;
+    minBet: number;
+    maxBet: number;
+    roundDurationMs: number;
+  }) => {
+    createRoom(options);
+  };
+
+  const handleCloseRoom = (roomId: string) => {
+    closeRoom(roomId);
   };
 
   // Show loading while checking for saved session
@@ -271,9 +414,6 @@ const App: React.FC = () => {
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        rooms={rooms}
-        selectedRoomId={selectedRoom}
-        onRoomSelect={setSelectedRoom}
         currentGame={currentGame}
         onGameChange={setCurrentGame}
       />
@@ -284,10 +424,18 @@ const App: React.FC = () => {
             player={player}
             currentRound={gameState.currentRound}
             config={gameState.config}
+            currentRoom={gameState.currentRoom}
+            availableRooms={gameState.availableRooms}
+            playerId={gameState.playerId}
             timeRemaining={timeRemaining}
             betAmount={betAmount}
             onBetAmountChange={setBetAmount}
             onPlaceBet={handlePlaceBet}
+            onRoomJoin={handleJoinRoom}
+            onRoomJoinByCode={handleJoinRoomByCode}
+            onRoomLeave={handleLeaveRoom}
+            onRoomClose={handleCloseRoom}
+            onRoomCreate={handleCreateRoom}
             winner={winner}
             roundStatus={roundStatus}
             onWinnerShown={() => {

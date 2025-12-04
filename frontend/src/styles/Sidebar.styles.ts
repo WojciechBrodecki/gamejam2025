@@ -142,3 +142,148 @@ export const GameName = styled.span`
   font-weight: 500;
   font-size: 0.9rem;
 `;
+
+export const CreateRoomButton = styled.button`
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  background: ${({ theme }) => theme.colors.gold};
+  color: #000;
+  border: none;
+  border-radius: ${({ theme }) => theme.radiusSm};
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.goldDim};
+    transform: translateY(-1px);
+  }
+`;
+
+export const CurrentRoomBadge = styled.div`
+  background: rgba(240, 192, 32, 0.1);
+  border: 1px solid ${({ theme }) => theme.colors.gold};
+  border-radius: ${({ theme }) => theme.radiusSm};
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+export const LeaveRoomButton = styled.button`
+  padding: 8px 12px;
+  background: rgba(220, 53, 69, 0.2);
+  color: #dc3545;
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  border-radius: ${({ theme }) => theme.radiusSm};
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-top: 4px;
+
+  &:hover {
+    background: rgba(220, 53, 69, 0.3);
+  }
+`;
+
+export const ModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+`;
+
+export const ModalContent = styled.div`
+  background: ${({ theme }) => theme.colors.bgCard};
+  border-radius: ${({ theme }) => theme.radius};
+  padding: 24px;
+  max-width: 400px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  label {
+    font-size: 0.8rem;
+    color: ${({ theme }) => theme.colors.textDim};
+    margin-top: 4px;
+  }
+`;
+
+export const ModalTitle = styled.h3`
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+`;
+
+export const ModalInput = styled.input`
+  padding: 12px;
+  background: ${({ theme }) => theme.colors.bgDark};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radiusSm};
+  color: ${({ theme }) => theme.colors.text};
+  font-size: 0.95rem;
+
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.colors.gold};
+  }
+`;
+
+export const ModalSelect = styled.select`
+  padding: 12px;
+  background: ${({ theme }) => theme.colors.bgDark};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radiusSm};
+  color: ${({ theme }) => theme.colors.text};
+  font-size: 0.95rem;
+
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.colors.gold};
+  }
+`;
+
+export const ModalButtonRow = styled.div`
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+`;
+
+export const ModalButton = styled.button<{ $primary?: boolean }>`
+  flex: 1;
+  padding: 12px;
+  border-radius: ${({ theme }) => theme.radiusSm};
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  
+  ${({ $primary, theme }) => $primary ? `
+    background: ${theme.colors.gold};
+    color: #000;
+    border: none;
+
+    &:hover {
+      background: ${theme.colors.goldDim};
+    }
+  ` : `
+    background: transparent;
+    color: ${theme.colors.textDim};
+    border: 1px solid ${theme.colors.border};
+
+    &:hover {
+      background: ${theme.colors.bgHover};
+      color: ${theme.colors.text};
+    }
+  `}
+`;
+
+export const CreateRoomModal = styled.div``;

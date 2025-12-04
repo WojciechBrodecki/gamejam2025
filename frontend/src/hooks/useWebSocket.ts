@@ -127,6 +127,60 @@ export function useWebSocket() {
     }
   }, []);
 
+  // Room-specific methods
+  const joinRoom = useCallback((roomId: string) => {
+    sendMessage({
+      type: 'JOIN_ROOM',
+      payload: { roomId },
+      timestamp: Date.now(),
+    });
+  }, [sendMessage]);
+
+  const joinRoomByCode = useCallback((inviteCode: string) => {
+    sendMessage({
+      type: 'JOIN_ROOM_BY_CODE',
+      payload: { inviteCode },
+      timestamp: Date.now(),
+    });
+  }, [sendMessage]);
+
+  const leaveRoom = useCallback(() => {
+    sendMessage({
+      type: 'LEAVE_ROOM',
+      payload: {},
+      timestamp: Date.now(),
+    });
+  }, [sendMessage]);
+
+  const createRoom = useCallback((options: {
+    name: string;
+    minBet: number;
+    maxBet: number;
+    roundDurationMs: number;
+  }) => {
+    sendMessage({
+      type: 'CREATE_ROOM',
+      payload: options,
+      timestamp: Date.now(),
+    });
+  }, [sendMessage]);
+
+  const closeRoom = useCallback((roomId: string) => {
+    sendMessage({
+      type: 'CLOSE_ROOM',
+      payload: { roomId },
+      timestamp: Date.now(),
+    });
+  }, [sendMessage]);
+
+  const getRooms = useCallback(() => {
+    sendMessage({
+      type: 'GET_ROOMS',
+      payload: {},
+      timestamp: Date.now(),
+    });
+  }, [sendMessage]);
+
   return {
     isConnected,
     lastMessage,
@@ -134,5 +188,11 @@ export function useWebSocket() {
     login,
     disconnect,
     tryAutoLogin,
+    joinRoom,
+    joinRoomByCode,
+    leaveRoom,
+    createRoom,
+    closeRoom,
+    getRooms,
   };
 }

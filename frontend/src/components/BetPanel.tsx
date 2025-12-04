@@ -21,6 +21,8 @@ interface BetPanelProps {
   playerTotalBet: number;
   playerChance: string;
   isDisabled: boolean;
+  minBet?: number;
+  maxBet?: number;
 }
 
 const BetPanel: React.FC<BetPanelProps> = ({
@@ -31,30 +33,33 @@ const BetPanel: React.FC<BetPanelProps> = ({
   playerTotalBet,
   playerChance,
   isDisabled,
+  minBet = 1,
+  maxBet = 10000,
 }) => {
   const currentBet = parseFloat(betAmount) || 0;
+  const effectiveMaxBet = Math.min(maxBet, playerBalance);
 
   const modifyBet = (operation: 'half' | 'minus10' | 'minus1' | 'plus1' | 'plus10' | 'double') => {
     let newValue = currentBet;
 
     switch (operation) {
       case 'half':
-        newValue = Math.floor(currentBet / 2);
+        newValue = Math.max(minBet, Math.floor(currentBet / 2));
         break;
       case 'minus10':
-        newValue = Math.max(0, currentBet - 10);
+        newValue = Math.max(minBet, currentBet - 10);
         break;
       case 'minus1':
-        newValue = Math.max(0, currentBet - 1);
+        newValue = Math.max(minBet, currentBet - 1);
         break;
       case 'plus1':
-        newValue = Math.min(playerBalance, currentBet + 1);
+        newValue = Math.min(effectiveMaxBet, currentBet + 1);
         break;
       case 'plus10':
-        newValue = Math.min(playerBalance, currentBet + 10);
+        newValue = Math.min(effectiveMaxBet, currentBet + 10);
         break;
       case 'double':
-        newValue = Math.min(playerBalance, currentBet * 2);
+        newValue = Math.min(effectiveMaxBet, currentBet * 2);
         break;
     }
 
@@ -107,21 +112,21 @@ const BetPanel: React.FC<BetPanelProps> = ({
         
         <BetModifierButton
           onClick={() => modifyBet('plus1')}
-          disabled={currentBet >= playerBalance}
+          disabled={currentBet >= effectiveMaxBet}
         >
           +1
         </BetModifierButton>
         
         <BetModifierButton
           onClick={() => modifyBet('plus10')}
-          disabled={currentBet + 10 > playerBalance}
+          disabled={currentBet + 10 > effectiveMaxBet}
         >
           +10
         </BetModifierButton>
         
         <BetModifierButton
           onClick={() => modifyBet('double')}
-          disabled={currentBet * 2 > playerBalance || currentBet === 0}
+          disabled={currentBet * 2 > effectiveMaxBet || currentBet === 0}
           $variant="success"
         >
           x2
@@ -130,7 +135,7 @@ const BetPanel: React.FC<BetPanelProps> = ({
 
       <PlaceBetButton
         onClick={onPlaceBet}
-        disabled={isDisabled || currentBet <= 0 || (playerBalance > 0 && currentBet > playerBalance)}
+        disabled={isDisabled || currentBet < minBet || currentBet > effectiveMaxBet}
       >
         Postaw zakład
       </PlaceBetButton>

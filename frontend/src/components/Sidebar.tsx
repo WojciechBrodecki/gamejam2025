@@ -6,31 +6,15 @@ import {
   CloseButton,
   SidebarSection,
   SectionTitle,
-  RoomList,
-  RoomItem,
-  RoomName,
-  RoomMeta,
   GameList,
   GameItem,
   GameIcon,
   GameName,
 } from '../styles/Sidebar.styles';
 
-export interface Room {
-  id: string;
-  name: string;
-  type: 'open-limit' | '1:1';
-  minBet?: number;
-  maxBet?: number;
-  playersCount: number;
-}
-
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  rooms: Room[];
-  selectedRoomId: string;
-  onRoomSelect: (roomId: string) => void;
   currentGame: 'grand-wager' | 'timber-fever';
   onGameChange: (game: 'grand-wager' | 'timber-fever') => void;
 }
@@ -38,25 +22,12 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ 
   isOpen, 
   onClose, 
-  rooms, 
-  selectedRoomId, 
-  onRoomSelect,
   currentGame,
   onGameChange,
 }) => {
-  const openLimitRooms = rooms.filter(r => r.type === 'open-limit');
-  const oneToOneRooms = rooms.filter(r => r.type === '1:1');
-
-  const handleRoomClick = (roomId: string) => {
-    onRoomSelect(roomId);
-    onClose();
-  };
-
   const handleGameClick = (game: 'grand-wager' | 'timber-fever') => {
     onGameChange(game);
-    if (game === 'timber-fever') {
-      onClose();
-    }
+    onClose();
   };
 
   return (
@@ -70,13 +41,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         </SidebarHeader>
 
         <SidebarSection>
-          <SectionTitle>Gry</SectionTitle>
+          <SectionTitle>Wybierz grę</SectionTitle>
           <GameList>
             <GameItem 
               $active={currentGame === 'grand-wager'}
               onClick={() => handleGameClick('grand-wager')}
             >
-              <GameIcon>GW</GameIcon>
+              <GameIcon>🎰</GameIcon>
               <GameName>GRAND WAGER</GameName>
             </GameItem>
             <GameItem 
@@ -88,42 +59,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             </GameItem>
           </GameList>
         </SidebarSection>
-
-        {currentGame === 'grand-wager' && (
-          <>
-            <SidebarSection>
-              <SectionTitle>Open Limit</SectionTitle>
-              <RoomList>
-                {openLimitRooms.map(room => (
-                  <RoomItem
-                    key={room.id}
-                    $active={selectedRoomId === room.id}
-                    onClick={() => handleRoomClick(room.id)}
-                  >
-                    <RoomName>{room.name}</RoomName>
-                    <RoomMeta>{room.playersCount} online</RoomMeta>
-                  </RoomItem>
-                ))}
-              </RoomList>
-            </SidebarSection>
-
-            <SidebarSection>
-              <SectionTitle>Pojedynki 1:1</SectionTitle>
-              <RoomList>
-                {oneToOneRooms.map(room => (
-                  <RoomItem
-                    key={room.id}
-                    $active={selectedRoomId === room.id}
-                    onClick={() => handleRoomClick(room.id)}
-                  >
-                    <RoomName>{room.name}</RoomName>
-                    <RoomMeta>{room.playersCount}/2</RoomMeta>
-                  </RoomItem>
-                ))}
-              </RoomList>
-            </SidebarSection>
-          </>
-        )}
       </SidebarWrapper>
     </>
   );
