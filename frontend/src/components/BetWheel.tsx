@@ -185,9 +185,21 @@ const BetWheel: React.FC<BetWheelProps> = ({
     // Oblicz docelowy kąt
     const winningAngle = (winner.winningNumber / totalPool) * 360;
     const spins = 5; // 5 pełnych obrotów
-    const targetRotation = spins * 360 + (360 - winningAngle);
+    
+    // Normalizuj aktualną rotację do 0-360
+    const currentNormalizedRotation = rotation % 360;
+    // Oblicz ile musimy obrócić żeby trafić na zwycięzcę (wskaźnik jest na górze = -90 stopni)
+    // Koło kręci się zgodnie z ruchem wskazówek zegara, więc musimy obrócić tak żeby winningAngle był przy wskaźniku
+    const finalAngle = 360 - winningAngle; // gdzie ma się zatrzymać (od pozycji 0)
+    
+    // Oblicz ile stopni musimy dodać do aktualnej pozycji
+    let additionalRotation = finalAngle - currentNormalizedRotation;
+    if (additionalRotation < 0) additionalRotation += 360; // zawsze kręć do przodu
+    
+    // Dodaj pełne obroty + dodatkową rotację do osiągnięcia celu
+    const targetRotation = rotation + (spins * 360) + additionalRotation;
 
-    console.log('Target rotation:', targetRotation, 'Winning angle:', winningAngle);
+    console.log('Target rotation:', targetRotation, 'Winning angle:', winningAngle, 'Current rotation:', rotation);
 
     // Animacja kręcenia - 1 obrót na sekundę = 5 sekund na 5 obrotów
     const duration = 3000; // 3 sekundy
