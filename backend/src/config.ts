@@ -14,7 +14,7 @@ export interface Config {
 
 export const config: Config = {
   mongodbUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/casino',
-  roundDurationMs: parseInt(process.env.ROUND_DURATION_MS || '5000', 10),
+  roundDurationMs: parseInt(process.env.ROUND_DURATION_MS || '10000', 10),
   roundDelayMs: parseInt(process.env.ROUND_DELAY_MS || '5000', 10), // 5s delay between rounds
   casinoCommissionPercent: parseFloat(process.env.CASINO_COMMISSION_PERCENT || '5'),
   minBet: parseInt(process.env.MIN_BET || '1', 10),
