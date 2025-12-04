@@ -95,14 +95,6 @@ export class WebSocketService {
       ws.on('close', (code, reason) => {
         console.log(`WebSocket connection closed. Code: ${code}, Reason: ${reason.toString()}`);
         this.clients.delete(ws);
-        
-        if (ws.playerId) {
-          this.broadcast({
-            type: 'PLAYER_LEFT',
-            payload: { playerId: ws.playerId, username: ws.playerUsername },
-            timestamp: Date.now(),
-          });
-        }
       });
 
       ws.on('error', (error: Error & { code?: string }) => {
@@ -160,18 +152,6 @@ export class WebSocketService {
     ws.playerId = player.id;
     ws.playerUsername = player.username;
 
-    // Broadcast player joined
-    this.broadcast({
-      type: 'PLAYER_JOINED',
-      payload: { 
-        playerId: player.id, 
-        username: player.username,
-        balance: player.balance,
-        avatar: player.avatar || null,
-      },
-      timestamp: Date.now(),
-    });
-
     // Send current state to the joining player
     await this.handleSyncState(ws);
   }
@@ -214,17 +194,6 @@ export class WebSocketService {
     ws.playerId = player.id;
     ws.playerUsername = player.username;
 
-    // Broadcast player joined
-    this.broadcast({
-      type: 'PLAYER_JOINED',
-      payload: { 
-        playerId: player.id, 
-        username: player.username,
-        balance: player.balance,
-      },
-      timestamp: Date.now(),
-    });
-
     // Send current state to the joining player
     await this.handleSyncState(ws);
   }
@@ -253,7 +222,6 @@ export class WebSocketService {
   private async handleSyncState(ws: ExtendedWebSocket): Promise<void> {
     const currentRound = gameService.getCurrentRound();
     const config = gameService.getConfig();
-    const players = await gameService.getAllPlayers();
 
     this.sendToClient(ws, {
       type: 'SYNC_STATE',
@@ -267,12 +235,6 @@ export class WebSocketService {
           status: currentRound.status,
         } : null,
         config,
-        players: players.map(p => ({
-          id: p.id,
-          username: p.username,
-          balance: p.balance,
-          avatar: p.avatar || null,
-        })),
         playerId: ws.playerId,
       },
       timestamp: Date.now(),
