@@ -16,6 +16,7 @@ interface Winner {
   playerId: string;
   username: string;
   amount: number;
+  winningNumber: number;
 }
 
 interface GrandWagerProps {
@@ -64,7 +65,6 @@ const GrandWager: React.FC<GrandWagerProps> = ({
         timeRemaining={timeRemaining}
         currentPlayerId={player?.id || null}
         winner={winner}
-        roundId={currentRound?.id || null}
         onWinnerShown={onWinnerShown}
       />
 

@@ -114,6 +114,13 @@ export const UserAvatar = styled.div`
   font-weight: 600;
   font-size: 0.9rem;
   color: white;
+  overflow: hidden;
+`;
+
+export const AvatarImage = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 `;
 
 export const DropdownOverlay = styled.div`
@@ -152,6 +159,13 @@ export const DropdownAvatar = styled.div`
   justify-content: center;
   font-weight: 600;
   color: white;
+  overflow: hidden;
+`;
+
+export const DropdownAvatarImage = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 `;
 
 export const DropdownUsername = styled.span`

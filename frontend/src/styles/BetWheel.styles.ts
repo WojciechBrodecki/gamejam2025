@@ -1,15 +1,5 @@
 import styled, { keyframes, css } from 'styled-components';
 
-// Animacja kręcenia koła
-const spin = keyframes`
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-`;
-
 // Animacja pulsowania timera
 const timerPulse = keyframes`
   0%, 100% {
@@ -64,7 +54,7 @@ export const WheelPointer = styled.div`
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
 `;
 
-export const WheelSvg = styled.svg<{ $spinning: boolean; $spinDuration?: number; $targetRotation?: number }>`
+export const WheelSvg = styled.svg`
   width: 100%;
   height: 100%;
   border-radius: 50%;
@@ -72,14 +62,6 @@ export const WheelSvg = styled.svg<{ $spinning: boolean; $spinDuration?: number;
     0 0 0 4px ${({ theme }) => theme.colors.gold},
     0 0 20px rgba(240, 192, 32, 0.3),
     inset 0 0 30px rgba(0,0,0,0.5);
-  
-  ${({ $spinning }) => $spinning && css`
-    animation: ${spin} 0.15s linear infinite;
-  `}
-  
-  /* Ease-out transition for smooth slowdown */
-  transition: ${({ $spinning }) => $spinning ? 'none' : 'transform 5s cubic-bezier(0.15, 0.85, 0.25, 1)'};
-  transform: ${({ $targetRotation }) => $targetRotation ? `rotate(${$targetRotation}deg)` : 'rotate(0deg)'};
 `;
 
 export const TimerCenter = styled.div`
@@ -179,6 +161,13 @@ export const WinnerIcon = styled.div<{ $color?: string }>`
   justify-content: center;
   font-size: 1.8rem;
   box-shadow: 0 0 20px ${({ $color }) => $color || '#f0c020'}80;
+  overflow: hidden;
+`;
+
+export const WinnerAvatar = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 `;
 
 export const WinnerTitle = styled.div<{ $isYou?: boolean }>`

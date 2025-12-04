@@ -289,3 +289,240 @@ export const StatusDot = styled.span<{ $connected: boolean }>`
   background: ${({ $connected, theme }) => $connected ? theme.colors.green : theme.colors.red};
   box-shadow: 0 0 8px ${({ $connected, theme }) => $connected ? theme.colors.green : theme.colors.red};
 `;
+
+export const AvatarSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 24px;
+`;
+
+export const AvatarLabel = styled.label`
+  color: ${({ theme }) => theme.colors.textDim};
+  font-size: 0.8rem;
+  margin-bottom: 12px;
+  font-weight: 500;
+`;
+
+export const AvatarPreview = styled.div`
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: ${({ theme }) => theme.colors.bgDark};
+  border: 3px solid ${({ theme }) => theme.colors.border};
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s, transform 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.gold};
+    transform: scale(1.05);
+  }
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+`;
+
+export const AvatarPlaceholder = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: ${({ theme }) => theme.colors.textMuted};
+
+  span {
+    font-size: 0.65rem;
+    text-align: center;
+  }
+`;
+
+export const AvatarInput = styled.input`
+  display: none;
+`;
+
+// Modal styles
+export const ModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+`;
+
+export const ModalContent = styled.div`
+  background: ${({ theme }) => theme.colors.bgCard};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: 16px;
+  padding: 24px;
+  width: 90%;
+  max-width: 400px;
+  animation: slideUp 0.3s ease;
+  
+  @keyframes slideUp {
+    from { 
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to { 
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+`;
+
+export const ModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  
+  h3 {
+    color: ${({ theme }) => theme.colors.text};
+    font-size: 1.1rem;
+    margin: 0;
+  }
+`;
+
+export const ModalCloseButton = styled.button`
+  background: none;
+  border: none;
+  color: ${({ theme }) => theme.colors.textMuted};
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:hover {
+    color: ${({ theme }) => theme.colors.text};
+  }
+`;
+
+export const ModalOptions = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+`;
+
+export const ModalOption = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: ${({ theme }) => theme.colors.bgDark};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: 12px;
+  color: ${({ theme }) => theme.colors.text};
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.gold};
+    background: rgba(240, 192, 32, 0.1);
+  }
+  
+  svg {
+    flex-shrink: 0;
+    color: ${({ theme }) => theme.colors.gold};
+  }
+`;
+
+export const ModalOptionText = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  
+  span:first-child {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  
+  span:last-child {
+    font-size: 0.75rem;
+    color: ${({ theme }) => theme.colors.textMuted};
+  }
+`;
+
+// Camera view styles
+export const CameraContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+`;
+
+export const CameraPreview = styled.div`
+  width: 100%;
+  max-width: 300px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  background: ${({ theme }) => theme.colors.bgDark};
+  border: 3px solid ${({ theme }) => theme.colors.border};
+  position: relative;
+  
+  video, canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+`;
+
+export const CameraActions = styled.div`
+  display: flex;
+  gap: 12px;
+  width: 100%;
+`;
+
+export const CameraButton = styled.button<{ $variant?: 'primary' | 'secondary' }>`
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  ${({ $variant, theme }) => $variant === 'primary' ? `
+    background: linear-gradient(135deg, ${theme.colors.gold}, #c0a020);
+    border: none;
+    color: #0d0d14;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(240, 192, 32, 0.4);
+    }
+  ` : `
+    background: transparent;
+    border: 1px solid ${theme.colors.border};
+    color: ${theme.colors.text};
+    
+    &:hover {
+      border-color: ${theme.colors.gold};
+    }
+  `}
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+`;

@@ -2,6 +2,7 @@ export interface Player {
   id: string;
   username: string;
   balance: number;
+  avatar?: string | null;
 }
 
 export interface Bet {
@@ -45,8 +46,6 @@ export type WSMessageType =
   | 'BET_PLACED'
   | 'ROUND_END'
   | 'ROUND_START'
-  | 'PLAYER_JOINED'
-  | 'PLAYER_LEFT'
   | 'ERROR'
   | 'PLACE_BET'
   | 'JOIN_GAME'
