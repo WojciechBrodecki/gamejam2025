@@ -36,8 +36,8 @@ async function start(): Promise<void> {
       const wsService = new WebSocketService(server);
       gameService.setWebSocketService(wsService);
       
-      // Start the first round
-      gameService.startNewRound();
+      // Create waiting round (will start when 2 players bet)
+      gameService.createWaitingRound();
     });
   } catch (error) {
     console.error('Failed to start server:', error);

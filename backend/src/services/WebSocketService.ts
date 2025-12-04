@@ -118,9 +118,14 @@ export class WebSocketService {
       });
       
       // Send a welcome message to confirm connection is stable
+      const currentRound = gameService.getCurrentRound();
       this.sendToClient(ws, {
         type: 'CONNECTED',
-        payload: { message: 'WebSocket connection established', username: nickname },
+        payload: { 
+          message: 'WebSocket connection established', 
+          username: nickname,
+          roundStatus: currentRound?.status || 'waiting',
+        },
         timestamp: Date.now(),
       });
     });

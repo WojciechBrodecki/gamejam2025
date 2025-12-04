@@ -12,6 +12,69 @@ export class GameService {
     this.wsService = wsService;
   }
 
+  // Create a waiting round that collects bets until 2 players bet
+  async createWaitingRound(): Promise<IRound> {
+    const round = new Round({
+      id: uuidv4(),
+      startTime: null,
+      endTime: null,
+      bets: [],
+      totalPool: 0,
+      status: 'waiting',
+    });
+
+    await round.save();
+    this.currentRound = round;
+
+    // Broadcast waiting round created
+    this.wsService?.broadcast({
+      type: 'ROUND_WAITING',
+      payload: {
+        round: this.formatRound(round),
+        message: 'Waiting for at least 2 players to place bets',
+      },
+      timestamp: Date.now(),
+    });
+
+    console.log(`Waiting round created: ${round.id}`);
+    return round;
+  }
+
+  // Start the round timer (called when 2 players have bet)
+  private async activateRound(): Promise<void> {
+    if (!this.currentRound || this.currentRound.status !== 'waiting') {
+      return;
+    }
+
+    const now = new Date();
+    const endTime = new Date(now.getTime() + config.roundDurationMs);
+
+    this.currentRound.startTime = now;
+    this.currentRound.endTime = endTime;
+    this.currentRound.status = 'active';
+    await this.currentRound.save();
+
+    // Broadcast round start
+    this.wsService?.broadcast({
+      type: 'ROUND_START',
+      payload: {
+        round: this.formatRound(this.currentRound),
+        timeRemaining: config.roundDurationMs,
+      },
+      timestamp: Date.now(),
+    });
+
+    // Set timer for round end
+    this.roundTimer = setTimeout(() => {
+      this.endRound();
+    }, config.roundDurationMs);
+
+    // Send updates every second
+    this.startRoundUpdates();
+
+    console.log(`Round activated: ${this.currentRound.id}`);
+  }
+
   async startNewRound(): Promise<IRound> {
     const now = new Date();
     const endTime = new Date(now.getTime() + config.roundDurationMs);
@@ -52,7 +115,7 @@ export class GameService {
 
   private startRoundUpdates(): void {
     const updateInterval = setInterval(() => {
-      if (!this.currentRound || this.currentRound.status === 'finished') {
+      if (!this.currentRound || this.currentRound.status === 'finished' || !this.currentRound.endTime) {
         clearInterval(updateInterval);
         return;
       }
@@ -119,6 +182,15 @@ export class GameService {
     });
 
     console.log(`Bet placed: ${player.username} - ${amount}`);
+
+    // Check if we should activate the round (2 unique players have bet)
+    if (this.currentRound.status === 'waiting') {
+      const uniquePlayers = new Set(this.currentRound.bets.map(b => b.playerId));
+      if (uniquePlayers.size >= 2) {
+        await this.activateRound();
+      }
+    }
+
     return { success: true, message: 'Bet placed successfully' };
   }
 
@@ -176,9 +248,9 @@ export class GameService {
     await this.currentRound.save();
     this.currentRound = null;
 
-    // Start new round after short delay
+    // Create new waiting round after short delay
     setTimeout(() => {
-      this.startNewRound();
+      this.createWaitingRound();
     }, 5000);
   }
 
