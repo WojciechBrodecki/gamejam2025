@@ -12,7 +12,15 @@
     "restart": "pm2 restart all",
     "logs": "pm2 logs"
   },
-  "keywords": ["casino", "game", "lottery", "websocket"],
+  "keywords": [
+    "casino",
+    "game",
+    "lottery",
+    "websocket"
+  ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "webpack-cli": "^6.0.1"
+  }
 }

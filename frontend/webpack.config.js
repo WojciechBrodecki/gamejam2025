@@ -35,23 +35,9 @@ module.exports = {
       directory: path.join(__dirname, 'dist'),
     },
     compress: true,
-    port: 3000,
-    hot: true,
-    proxy: [
-      {
-        context: ['/api'],
-        target: 'http://localhost:3001',
-      },
-      {
-        context: ['/ws'],
-        target: 'http://localhost:3001',
-        ws: true,
-        changeOrigin: true,
-      },
-    ],
-    client: {
-      webSocketURL: 'auto://0.0.0.0:0/ws',
-    },
+    port: 5000,
+    hot: true,  // Wyłączone HMR - nie będzie WebSocket do 5000
+    liveReload: true,
   },
   mode: 'development',
 };

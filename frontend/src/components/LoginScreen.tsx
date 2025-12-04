@@ -1,4 +1,20 @@
 import React, { useState } from 'react';
+import {
+  LoginPage,
+  LoginBackground,
+  FloatingCard,
+  FloatingChip,
+  GlowOrb,
+  LoginContainer,
+  LoginHeader,
+  CasinoLogo,
+  CasinoTagline,
+  LoginForm,
+  InputGroup,
+  LoginButton,
+  ConnectionIndicator,
+  StatusDot,
+} from '../styles/LoginScreen.styles';
 
 interface LoginScreenProps {
   isConnected: boolean;
@@ -16,26 +32,28 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ isConnected, onLogin }) => {
   };
 
   return (
-    <div className="login-page">
-      <div className="login-background">
-        <div className="floating-card card-1">🂡</div>
-        <div className="floating-card card-2">🂮</div>
-        <div className="floating-card card-3">🃁</div>
-        <div className="floating-card card-4">🃞</div>
-        <div className="floating-chip chip-1">🪙</div>
-        <div className="floating-chip chip-2">🪙</div>
-      </div>
+    <LoginPage>
+      <LoginBackground>
+        <GlowOrb $position="top" />
+        <GlowOrb $position="bottom" />
+        <FloatingCard $variant={1}>A</FloatingCard>
+        <FloatingCard $variant={2}>K</FloatingCard>
+        <FloatingCard $variant={3}>Q</FloatingCard>
+        <FloatingCard $variant={4}>J</FloatingCard>
+        <FloatingChip $variant={1}>●</FloatingChip>
+        <FloatingChip $variant={2}>●</FloatingChip>
+      </LoginBackground>
 
-      <div className="login-container">
-        <div className="login-header">
-          <h1 className="casino-logo">🎰 ROYAL CASINO</h1>
-          <p className="casino-tagline">Szczęście sprzyja odważnym</p>
-        </div>
+      <LoginContainer>
+        <LoginHeader>
+          <CasinoLogo>GRAND WAGER</CasinoLogo>
+          <CasinoTagline>Szczęście sprzyja odważnym</CasinoTagline>
+        </LoginHeader>
 
-        <form className="login-form" onSubmit={handleSubmit}>
+        <LoginForm onSubmit={handleSubmit}>
           <h2>Dołącz do gry</h2>
           
-          <div className="input-group">
+          <InputGroup>
             <label htmlFor="username">Nazwa gracza</label>
             <input
               id="username"
@@ -46,9 +64,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ isConnected, onLogin }) => {
               autoFocus
               maxLength={20}
             />
-          </div>
+          </InputGroup>
 
-          <button type="submit" className="login-btn" disabled={!isConnected || !username.trim()}>
+          <LoginButton type="submit" disabled={!isConnected || !username.trim()}>
             {isConnected ? (
               <>
                 <span>Wejdź do kasyna</span>
@@ -59,15 +77,15 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ isConnected, onLogin }) => {
             ) : (
               <span>Łączenie z serwerem...</span>
             )}
-          </button>
-        </form>
+          </LoginButton>
+        </LoginForm>
 
-        <div className={`connection-indicator ${isConnected ? 'connected' : ''}`}>
-          <span className="status-dot"></span>
+        <ConnectionIndicator $connected={isConnected}>
+          <StatusDot $connected={isConnected} />
           <span>{isConnected ? 'Połączono z serwerem' : 'Łączenie...'}</span>
-        </div>
-      </div>
-    </div>
+        </ConnectionIndicator>
+      </LoginContainer>
+    </LoginPage>
   );
 };
 
