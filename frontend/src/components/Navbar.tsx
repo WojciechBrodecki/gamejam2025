@@ -25,6 +25,8 @@ interface NavbarProps {
   balance: number;
   username: string;
   playerId: string | null;
+  roomName?: string | null;
+  gameName?: string;
   onMenuToggle: () => void;
   onLogout: () => void;
 }
@@ -33,6 +35,8 @@ const Navbar: React.FC<NavbarProps> = ({
   balance,
   username,
   playerId,
+  roomName,
+  gameName = 'GRAND WAGER',
   onMenuToggle,
   onLogout,
 }) => {
@@ -68,7 +72,7 @@ const Navbar: React.FC<NavbarProps> = ({
         <span></span>
       </MenuButton>
 
-      <NavLogo>GRAND WAGER</NavLogo>
+      <NavLogo>{roomName || gameName}</NavLogo>
 
       <NavUser>
         <NavBalance $animate={balanceAnimate}>

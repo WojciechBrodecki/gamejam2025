@@ -474,6 +474,8 @@ const App: React.FC = () => {
         balance={player?.balance || 1000}
         username={player?.username || 'Gracz'}
         playerId={player?.id || gameState.playerId}
+        roomName={gameState.currentRoom?.name}
+        gameName="GRAND WAGER"
         onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         onLogout={handleLogout}
       />

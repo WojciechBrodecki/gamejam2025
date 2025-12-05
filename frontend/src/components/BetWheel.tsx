@@ -93,6 +93,16 @@ const BetWheel: React.FC<BetWheelProps> = ({
   const lastWinnerIdRef = useRef<string | null>(null);
   const animationRef = useRef<number | null>(null);
   
+  // Refs do aktualnych wartości (żeby useEffect nie reagował na ich zmiany)
+  const currentBetsRef = useRef<Bet[]>(bets);
+  const currentTotalPoolRef = useRef<number>(totalPool);
+  
+  // Aktualizuj refs przy każdej zmianie
+  useEffect(() => {
+    currentBetsRef.current = bets;
+    currentTotalPoolRef.current = totalPool;
+  }, [bets, totalPool]);
+  
   // Ref do przechowywania ostatnich niepustych bets (dla przypadku gdy ROUND_WAITING przychodzi przed animacją)
   const lastValidBetsRef = useRef<{bets: Bet[], totalPool: number}>({bets: [], totalPool: 0});
   
@@ -162,17 +172,19 @@ const BetWheel: React.FC<BetWheelProps> = ({
     }
     
     // Użyj aktualnych bets jeśli są dostępne, lub ostatnich zapisanych
-    const sourceBets = bets.length > 0 ? bets : lastValidBetsRef.current.bets;
+    const currentBets = currentBetsRef.current;
+    const currentPool = currentTotalPoolRef.current;
+    const sourceBets = currentBets.length > 0 ? currentBets : lastValidBetsRef.current.bets;
     // Użyj totalPool z winner jeśli jest dostępny (najbardziej wiarygodne), potem aktualne, potem zapisane
-    const sourcePool = winner.totalPool || (totalPool > 0 ? totalPool : lastValidBetsRef.current.totalPool);
+    const sourcePool = winner.totalPool || (currentPool > 0 ? currentPool : lastValidBetsRef.current.totalPool);
     
     console.log('[BetWheel] Winner received:', { 
       winnerId, 
       'winner.totalPool': winner.totalPool, 
-      totalPool, 
+      'currentPool': currentPool, 
       'lastValidBetsRef.totalPool': lastValidBetsRef.current.totalPool,
       sourcePool,
-      'bets.length': bets.length,
+      'currentBets.length': currentBets.length,
       'sourceBets.length': sourceBets.length
     });
     
@@ -278,12 +290,10 @@ const BetWheel: React.FC<BetWheelProps> = ({
 
     animationRef.current = requestAnimationFrame(animate);
 
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [winner, bets, totalPool]);
+    // Cleanup tylko przy unmount, NIE przy zmianie dependencies
+    // bo zmiana bets/totalPool nie powinna przerywać trwającej animacji
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [winner]);
 
   // Funkcja do zamykania popup winnera
   const closeWinnerPopup = () => {

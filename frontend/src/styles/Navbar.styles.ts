@@ -85,9 +85,20 @@ export const NavLogo = styled.div`
   font-weight: 800;
   color: ${({ theme }) => theme.colors.gold};
   letter-spacing: 1px;
+  
+  /* Wycentruj względem środka strony */
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 40%;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 
   @media (min-width: 768px) {
     font-size: 1.3rem;
+    max-width: 50%;
   }
 `;
 
