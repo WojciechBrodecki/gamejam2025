@@ -84,6 +84,9 @@ const BetWheel: React.FC<BetWheelProps> = ({
   const [isSpinning, setIsSpinning] = useState(false);
   const [showWinnerPopup, setShowWinnerPopup] = useState(false);
   
+  // Ref dla rotation żeby mieć zawsze aktualną wartość w useEffect
+  const rotationRef = useRef(0);
+  
   // Zapamiętane dane do wyświetlenia podczas animacji
   const [displayBets, setDisplayBets] = useState<Bet[]>([]);
   const [displayPool, setDisplayPool] = useState(0);
@@ -152,11 +155,12 @@ const BetWheel: React.FC<BetWheelProps> = ({
 
   // Główna logika animacji - reaguj na nowego winnera
   useEffect(() => {
-    console.log('[BetWheel] useEffect triggered, winner:', winner ? 'yes' : 'no', 'lastWinnerIdRef:', lastWinnerIdRef.current);
+    console.log('[BetWheel] useEffect triggered, winner:', winner ? 'yes' : 'no', 'lastWinnerIdRef:', lastWinnerIdRef.current, 'animationRef:', animationRef.current);
     
     if (!winner) {
-      // Reset gdy winner zniknie
-      lastWinnerIdRef.current = null;
+      // NIE resetuj lastWinnerIdRef gdy winner zniknie - to zapobiega ponownemu uruchomieniu animacji
+      // jeśli winner wróci (np. przez re-render)
+      console.log('[BetWheel] No winner, keeping lastWinnerIdRef:', lastWinnerIdRef.current);
       return;
     }
 
@@ -168,6 +172,16 @@ const BetWheel: React.FC<BetWheelProps> = ({
     // Jeśli już obsłużyliśmy tego winnera, nic nie rób
     if (lastWinnerIdRef.current === winnerId) {
       console.log('[BetWheel] Already handled this winner, skipping');
+      return;
+    }
+    
+    // NATYCHMIAST oznacz że obsługujemy tego winnera - zapobiega race condition
+    lastWinnerIdRef.current = winnerId;
+    console.log('[BetWheel] Marked winnerId as handled:', winnerId);
+    
+    // Jeśli animacja jest w trakcie, nie zaczynaj nowej (ale winnerId już ustawiony)
+    if (animationRef.current !== null) {
+      console.log('[BetWheel] Animation already in progress, skipping but winnerId marked');
       return;
     }
     
@@ -193,7 +207,6 @@ const BetWheel: React.FC<BetWheelProps> = ({
       console.warn('[BetWheel] No totalPool available for animation, skipping');
       return;
     }
-    lastWinnerIdRef.current = winnerId;
     
     console.log('[BetWheel] Starting animation for winner:', winnerId);
 
@@ -242,8 +255,11 @@ const BetWheel: React.FC<BetWheelProps> = ({
     const winningAngle = (winner.winningNumber / sourcePool) * 360;
     const spins = 3; // 3 pełne obroty
     
+    // Użyj ref dla aktualnej rotacji (nie stare closure)
+    const currentRotationValue = rotationRef.current;
+    
     // Normalizuj aktualną rotację do 0-360
-    const currentNormalizedRotation = rotation % 360;
+    const currentNormalizedRotation = currentRotationValue % 360;
     // Oblicz ile musimy obrócić żeby trafić na zwycięzcę (wskaźnik jest na górze = -90 stopni)
     // Koło kręci się zgodnie z ruchem wskazówek zegara, więc musimy obrócić tak żeby winningAngle był przy wskaźniku
     const finalAngle = 360 - winningAngle; // gdzie ma się zatrzymać (od pozycji 0)
@@ -253,17 +269,17 @@ const BetWheel: React.FC<BetWheelProps> = ({
     if (additionalRotation < 0) additionalRotation += 360; // zawsze kręć do przodu
     
     // Dodaj pełne obroty + dodatkową rotację do osiągnięcia celu
-    const targetRotation = rotation + (spins * 360) + additionalRotation;
+    const targetRotation = currentRotationValue + (spins * 360) + additionalRotation;
 
-    console.log('[BetWheel] Animation params:', { winningAngle, currentNormalizedRotation, finalAngle, additionalRotation, targetRotation, currentRotation: rotation });
+    console.log('[BetWheel] Animation params:', { winningAngle, currentNormalizedRotation, finalAngle, additionalRotation, targetRotation, currentRotation: currentRotationValue });
 
     // Animacja kręcenia - 1 obrót na sekundę = 5 sekund na 5 obrotów
     const duration = 2000; // 2 sekundy
     const startTime = Date.now();
-    const startRotation = rotation;
+    const startRotation = currentRotationValue;
 
     setIsSpinning(true);
-    console.log('[BetWheel] setIsSpinning(true) called');
+    console.log('[BetWheel] setIsSpinning(true) called, startRotation:', startRotation, 'targetRotation:', targetRotation);
 
     const animate = () => {
       const elapsed = Date.now() - startTime;
@@ -272,13 +288,16 @@ const BetWheel: React.FC<BetWheelProps> = ({
       // Ease out - zwalnianie na końcu
       const easeOut = 1 - Math.pow(1 - progress, 3);
       
-      const currentRotation = startRotation + (targetRotation - startRotation) * easeOut;
-      setRotation(currentRotation);
+      const newRotation = startRotation + (targetRotation - startRotation) * easeOut;
+      rotationRef.current = newRotation; // Aktualizuj ref
+      setRotation(newRotation);
 
       if (progress < 1) {
         animationRef.current = requestAnimationFrame(animate);
       } else {
         // Animacja zakończona
+        console.log('[BetWheel] Animation finished at rotation:', newRotation);
+        animationRef.current = null; // Wyczyść ref po zakończeniu
         setIsSpinning(false);
         
         // Pokaż popup winnera po krótkim opóźnieniu
@@ -302,7 +321,11 @@ const BetWheel: React.FC<BetWheelProps> = ({
     setDisplayPool(0);
     setWinnerData(null);
     setRotation(0); // Reset koła do pozycji początkowej
+    rotationRef.current = 0; // Reset ref
+    animationRef.current = null; // Reset animation ref
+    lastWinnerIdRef.current = null; // Reset winner ref - pozwala na animację następnego winnera
     lastValidBetsRef.current = {bets: [], totalPool: 0}; // Reset cached bets
+    console.log('[BetWheel] closeWinnerPopup - all refs reset');
     onWinnerShown?.();
   };
 

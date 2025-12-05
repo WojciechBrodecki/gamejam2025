@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IBet {
+  id: string;
   playerId: string;
   playerUsername: string;
   amount: number;
@@ -21,6 +22,7 @@ export interface IRound extends Document {
 }
 
 const BetSchema: Schema = new Schema({
+  id: { type: String, required: true },
   playerId: { type: String, required: true },
   playerUsername: { type: String, required: true },
   amount: { type: Number, required: true },

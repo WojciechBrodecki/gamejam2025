@@ -507,15 +507,25 @@ export class RoomService {
 
     // Add bet to round
     const bet = {
+      id: `${playerId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       playerId: player.id,
       playerUsername: player.username,
       amount,
       timestamp: new Date(),
     };
 
+    // Użyj atomowej operacji zamiast save() żeby uniknąć race condition
+    await Round.findOneAndUpdate(
+      { id: state.currentRound.id },
+      { 
+        $push: { bets: bet },
+        $inc: { totalPool: amount }
+      }
+    );
+    
+    // Zaktualizuj lokalny stan
     state.currentRound.bets.push(bet);
     state.currentRound.totalPool += amount;
-    await state.currentRound.save();
 
     // Broadcast bet placed to room
     this.wsService?.broadcastToRoom(roomId, {
