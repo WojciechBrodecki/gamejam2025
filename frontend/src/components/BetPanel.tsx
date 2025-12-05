@@ -38,28 +38,41 @@ const BetPanel: React.FC<BetPanelProps> = ({
 }) => {
   const currentBet = parseFloat(betAmount) || 0;
   const effectiveMaxBet = Math.min(maxBet, playerBalance);
+  
+  // Calculate step values as powers of 10 based on the bet range
+  // Find the order of magnitude of the range
+  const range = effectiveMaxBet - minBet;
+  const magnitude = Math.floor(Math.log10(Math.max(range, 10)));
+  const smallStep = Math.pow(10, Math.max(0, magnitude - 1)); // e.g., 10 for range 100-1000
+  const largeStep = Math.pow(10, Math.max(1, magnitude)); // e.g., 100 for range 100-1000
 
-  const modifyBet = (operation: 'half' | 'minus10' | 'minus1' | 'plus1' | 'plus10' | 'double') => {
+  const modifyBet = (operation: 'half' | 'minusLarge' | 'minusSmall' | 'plusSmall' | 'plusLarge' | 'double' | 'min' | 'max') => {
     let newValue = currentBet;
 
     switch (operation) {
+      case 'min':
+        newValue = minBet;
+        break;
       case 'half':
         newValue = Math.max(minBet, Math.floor(currentBet / 2));
         break;
-      case 'minus10':
-        newValue = Math.max(minBet, currentBet - 10);
+      case 'minusLarge':
+        newValue = Math.max(minBet, currentBet - largeStep);
         break;
-      case 'minus1':
-        newValue = Math.max(minBet, currentBet - 1);
+      case 'minusSmall':
+        newValue = Math.max(minBet, currentBet - smallStep);
         break;
-      case 'plus1':
-        newValue = Math.min(effectiveMaxBet, currentBet + 1);
+      case 'plusSmall':
+        newValue = Math.min(effectiveMaxBet, currentBet + smallStep);
         break;
-      case 'plus10':
-        newValue = Math.min(effectiveMaxBet, currentBet + 10);
+      case 'plusLarge':
+        newValue = Math.min(effectiveMaxBet, currentBet + largeStep);
         break;
       case 'double':
         newValue = Math.min(effectiveMaxBet, currentBet * 2);
+        break;
+      case 'max':
+        newValue = effectiveMaxBet;
         break;
     }
 
@@ -74,31 +87,37 @@ const BetPanel: React.FC<BetPanelProps> = ({
     }
   };
 
+  // Format step display
+  const formatStep = (step: number): string => {
+    if (step >= 1000) return `${Math.round(step / 1000)}k`;
+    return step.toString();
+  };
+
   return (
     <BetPanelWrapper>
-      <BetPanelTitle>Postaw zakład</BetPanelTitle>
+      <BetPanelTitle>Postaw zakład (${minBet} - ${effectiveMaxBet})</BetPanelTitle>
       
       <BetControls>
         <BetModifierButton
           onClick={() => modifyBet('half')}
-          disabled={currentBet < 2}
+          disabled={currentBet <= minBet}
           $variant="danger"
         >
           /2
         </BetModifierButton>
         
         <BetModifierButton
-          onClick={() => modifyBet('minus10')}
-          disabled={currentBet < 10}
+          onClick={() => modifyBet('minusLarge')}
+          disabled={currentBet <= minBet}
         >
-          -10
+          -{formatStep(largeStep)}
         </BetModifierButton>
         
         <BetModifierButton
-          onClick={() => modifyBet('minus1')}
-          disabled={currentBet < 1}
+          onClick={() => modifyBet('minusSmall')}
+          disabled={currentBet <= minBet}
         >
-          -1
+          -{formatStep(smallStep)}
         </BetModifierButton>
         
         <BetInputWrapper>
@@ -106,22 +125,22 @@ const BetPanel: React.FC<BetPanelProps> = ({
             type="text"
             value={betAmount}
             onChange={handleInputChange}
-            placeholder="0"
+            placeholder={minBet.toString()}
           />
         </BetInputWrapper>
         
         <BetModifierButton
-          onClick={() => modifyBet('plus1')}
+          onClick={() => modifyBet('plusSmall')}
           disabled={currentBet >= effectiveMaxBet}
         >
-          +1
+          +{formatStep(smallStep)}
         </BetModifierButton>
         
         <BetModifierButton
-          onClick={() => modifyBet('plus10')}
-          disabled={currentBet + 10 > effectiveMaxBet}
+          onClick={() => modifyBet('plusLarge')}
+          disabled={currentBet >= effectiveMaxBet}
         >
-          +10
+          +{formatStep(largeStep)}
         </BetModifierButton>
         
         <BetModifierButton

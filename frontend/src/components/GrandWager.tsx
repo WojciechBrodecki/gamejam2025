@@ -21,6 +21,14 @@ const ShareIcon = () => (
   </svg>
 );
 
+const MoreIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+    <circle cx="12" cy="5" r="2" />
+    <circle cx="12" cy="12" r="2" />
+    <circle cx="12" cy="19" r="2" />
+  </svg>
+);
+
 const GrandWagerWrapper = styled.div`
   display: flex;
   flex-direction: column;
@@ -249,32 +257,86 @@ const BackButton = styled.button`
   }
 `;
 
-const ShareButton = styled.button`
+const MenuButton = styled.button`
   position: fixed;
   right: 20px;
   top: 76px;
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: rgba(41, 128, 185, 0.9);
-  border: none;
-  color: white;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  color: ${({ theme }) => theme.colors.text};
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s;
-  z-index: 50;
+  z-index: 51;
   
   &:hover {
-    background: rgba(41, 128, 185, 1);
-    transform: scale(1.05);
+    background: rgba(0, 0, 0, 0.8);
+    border-color: ${({ theme }) => theme.colors.gold};
+    color: ${({ theme }) => theme.colors.gold};
   }
 
   @media (min-width: 768px) {
     top: 84px;
     width: 48px;
     height: 48px;
+  }
+`;
+
+const MenuDropdown = styled.div`
+  position: fixed;
+  right: 20px;
+  top: 130px;
+  background: ${({ theme }) => theme.colors.bgCard};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radius};
+  min-width: 180px;
+  z-index: 100;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+
+  @media (min-width: 768px) {
+    top: 142px;
+  }
+`;
+
+const MenuOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99;
+`;
+
+const MenuItem = styled.button<{ $danger?: boolean; $disabled?: boolean }>`
+  width: 100%;
+  padding: 14px 16px;
+  background: none;
+  border: none;
+  color: ${({ theme, $danger, $disabled }) => 
+    $disabled ? theme.colors.textMuted :
+    $danger ? '#e74c3c' : 
+    theme.colors.text};
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: ${({ $disabled }) => $disabled ? 'not-allowed' : 'pointer'};
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.15s;
+  opacity: ${({ $disabled }) => $disabled ? 0.5 : 1};
+  
+  &:hover {
+    background: ${({ theme, $disabled }) => $disabled ? 'none' : theme.colors.bgHover};
+  }
+
+  &:not(:last-child) {
+    border-bottom: 1px solid ${({ theme }) => theme.colors.border};
   }
 `;
 
@@ -368,6 +430,7 @@ interface GrandWagerProps {
   currentRoom: Room | null;
   availableRooms: Room[];
   myRooms: Room[];
+  joinedRooms: Room[];
   playerId: string | null;
   timeRemaining: number;
   betAmount: string;
@@ -395,6 +458,7 @@ const GrandWager: React.FC<GrandWagerProps> = ({
   currentRoom,
   availableRooms,
   myRooms,
+  joinedRooms,
   playerId,
   timeRemaining,
   betAmount,
@@ -412,6 +476,7 @@ const GrandWager: React.FC<GrandWagerProps> = ({
   const [joinCode, setJoinCode] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
 
   // Create room form state
   const [newRoomName, setNewRoomName] = useState('');
@@ -469,15 +534,49 @@ const GrandWager: React.FC<GrandWagerProps> = ({
       }
     };
 
+    // Check if there are active bets (cannot delete room if someone is in pool)
+    const hasActiveBets = (currentRound?.bets?.length || 0) > 0;
+
     return (
       <GrandWagerWrapper>
         <BackButton onClick={handleBack} title={isCreator ? 'Zamknij pokój' : 'Opuść pokój'}>
           <ArrowLeftIcon />
         </BackButton>
-        {currentRoom.inviteCode && (
-          <ShareButton onClick={() => setShowQRModal(true)} title="Udostępnij pokój">
-            <ShareIcon />
-          </ShareButton>
+        
+        <MenuButton onClick={() => setShowMenu(!showMenu)}>
+          <MoreIcon />
+        </MenuButton>
+        
+        {showMenu && (
+          <>
+            <MenuOverlay onClick={() => setShowMenu(false)} />
+            <MenuDropdown>
+              {currentRoom.inviteCode && (
+                <MenuItem onClick={() => { setShowQRModal(true); setShowMenu(false); }}>
+                  <ShareIcon /> Zaproś
+                </MenuItem>
+              )}
+              {isCreator ? (
+                <MenuItem 
+                  $danger 
+                  $disabled={hasActiveBets}
+                  onClick={() => {
+                    if (!hasActiveBets) {
+                      onRoomClose(currentRoom.id);
+                      setShowMenu(false);
+                    }
+                  }}
+                  title={hasActiveBets ? 'Nie można usunąć - gracze są w puli' : ''}
+                >
+                  ✖ Usuń pokój {hasActiveBets && '(gracze w puli)'}
+                </MenuItem>
+              ) : (
+                <MenuItem $danger onClick={() => { onRoomLeave(); setShowMenu(false); }}>
+                  ← Opuść pokój
+                </MenuItem>
+              )}
+            </MenuDropdown>
+          </>
         )}
 
         <BetWheel
@@ -617,6 +716,29 @@ const GrandWager: React.FC<GrandWagerProps> = ({
                   <RoomStat>👥 {room.playerCount}/2</RoomStat>
                   <RoomStat>💰 ${room.minBet}-${room.maxBet}</RoomStat>
                   <RoomStat>🔑 {room.inviteCode}</RoomStat>
+                </RoomStats>
+                <JoinButton>Wejdź do pokoju</JoinButton>
+              </RoomCard>
+            ))}
+          </RoomsGrid>
+        </>
+      )}
+
+      {/* Joined Rooms Section */}
+      {joinedRooms.length > 0 && (
+        <>
+          <Divider>
+            <DividerLine />
+            <DividerText>🎮 Dołączone pokoje</DividerText>
+            <DividerLine />
+          </Divider>
+          <RoomsGrid>
+            {joinedRooms.map(room => (
+              <RoomCard key={room.id} onClick={() => onRoomJoin(room.id)}>
+                <RoomName>🎮 {room.name}</RoomName>
+                <RoomStats>
+                  <RoomStat>👥 {room.playerCount}/2</RoomStat>
+                  <RoomStat>💰 ${room.minBet}-${room.maxBet}</RoomStat>
                 </RoomStats>
                 <JoinButton>Wejdź do pokoju</JoinButton>
               </RoomCard>

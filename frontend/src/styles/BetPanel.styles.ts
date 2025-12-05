@@ -19,16 +19,25 @@ export const BetPanelTitle = styled.h3`
 
 export const BetControls = styled.div`
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 4px;
   margin-bottom: 16px;
+
+  @media (min-width: 400px) {
+    gap: 6px;
+  }
+
+  @media (min-width: 768px) {
+    gap: 8px;
+  }
 `;
 
 export const BetModifierButton = styled.button<{ $variant?: 'danger' | 'success' }>`
-  width: 48px;
-  height: 48px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 6px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -45,10 +54,25 @@ export const BetModifierButton = styled.button<{ $variant?: 'danger' | 'success'
     if ($variant === 'success') return theme.colors.green;
     return theme.colors.text;
   }};
-  font-size: 0.9rem;
+  font-size: 0.7rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
+
+  @media (min-width: 400px) {
+    min-width: 42px;
+    height: 42px;
+    padding: 0 8px;
+    font-size: 0.8rem;
+  }
+
+  @media (min-width: 768px) {
+    min-width: 48px;
+    height: 48px;
+    padding: 0 10px;
+    font-size: 0.9rem;
+  }
 
   &:hover:not(:disabled) {
     background: ${({ $variant, theme }) => {
@@ -70,34 +94,43 @@ export const BetModifierButton = styled.button<{ $variant?: 'danger' | 'success'
 `;
 
 export const BetInputWrapper = styled.div`
-  width: 100%;
+  flex: 1;
+  min-width: 60px;
+  max-width: 100px;
   position: relative;
-  order: -1;
-  margin-bottom: 8px;
-  
+
+  @media (min-width: 400px) {
+    min-width: 70px;
+    max-width: 120px;
+  }
+
   @media (min-width: 768px) {
-    width: auto;
-    flex: 1;
-    order: 0;
-    margin-bottom: 0;
+    min-width: 80px;
+    max-width: 140px;
   }
 `;
 
 export const BetInput = styled.input`
   width: 100%;
-  height: 56px;
-  padding: 0 16px;
+  height: 36px;
+  padding: 0 8px;
   background: ${({ theme }) => theme.colors.bgDark};
   border: 2px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radiusSm};
   color: ${({ theme }) => theme.colors.gold};
-  font-size: 1.5rem;
+  font-size: 1rem;
   font-weight: 700;
   text-align: center;
   transition: border-color 0.2s;
 
+  @media (min-width: 400px) {
+    height: 42px;
+    font-size: 1.1rem;
+  }
+
   @media (min-width: 768px) {
     height: 48px;
+    padding: 0 12px;
     font-size: 1.25rem;
   }
 

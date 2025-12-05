@@ -742,6 +742,16 @@ export class RoomService {
     }).sort({ createdAt: -1 });
   }
 
+  // Get all active private rooms that player has joined (but not created)
+  async getPlayerJoinedRooms(playerId: string): Promise<IRoom[]> {
+    return Room.find({ 
+      playerIds: playerId,
+      creatorId: { $ne: playerId }, // not the creator
+      type: 'private',
+      status: { $ne: 'closed' } 
+    }).sort({ createdAt: -1 });
+  }
+
   // Get count of active private rooms for a player
   async getPlayerActiveRoomsCount(playerId: string): Promise<number> {
     return Room.countDocuments({ 

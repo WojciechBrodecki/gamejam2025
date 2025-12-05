@@ -117,6 +117,7 @@ export class WebSocketService {
       // Send a welcome message with available rooms and player's own rooms
       const publicRooms = await roomService.getPublicRooms();
       const playerCreatedRooms = ws.playerId ? await roomService.getPlayerCreatedRooms(ws.playerId) : [];
+      const playerJoinedRooms = ws.playerId ? await roomService.getPlayerJoinedRooms(ws.playerId) : [];
       
       this.sendToClient(ws, {
         type: 'CONNECTED',
@@ -126,6 +127,7 @@ export class WebSocketService {
           playerId: ws.playerId,
           rooms: publicRooms.map(r => roomService.formatRoom(r)),
           myRooms: playerCreatedRooms.map(r => roomService.formatRoom(r)),
+          joinedRooms: playerJoinedRooms.map(r => roomService.formatRoom(r)),
         },
         timestamp: Date.now(),
       });
@@ -510,7 +512,7 @@ export class WebSocketService {
     if (!silent) {
       this.sendToClient(ws, {
         type: 'ROOM_LEFT',
-        payload: { message: 'Left room successfully' },
+        payload: { message: 'Left room successfully', roomId },
         timestamp: Date.now(),
       });
     }

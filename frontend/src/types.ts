@@ -70,6 +70,7 @@ export interface GameState {
   currentRoom: Room | null;
   availableRooms: Room[];
   myRooms: Room[]; // Player's own created private rooms
+  joinedRooms: Room[]; // Private rooms player has joined (but not created)
 }
 
 export type WSMessageType = 

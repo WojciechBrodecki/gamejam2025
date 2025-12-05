@@ -49,6 +49,7 @@ const App: React.FC = () => {
     currentRoom: null,
     availableRooms: [],
     myRooms: [],
+    joinedRooms: [],
   });
   
   const [betAmount, setBetAmount] = useState<string>('10');
@@ -108,6 +109,7 @@ const App: React.FC = () => {
             playerId: lastMessage.payload.playerId || prev.playerId,
             availableRooms: lastMessage.payload.rooms || [],
             myRooms: lastMessage.payload.myRooms || [],
+            joinedRooms: lastMessage.payload.joinedRooms || [],
           }));
           // Fetch player data to get balance
           if (lastMessage.payload.playerId) {
@@ -118,13 +120,28 @@ const App: React.FC = () => {
 
       case 'ROOM_JOINED':
         // Joined a room - update state with room data
-        setGameState(prev => ({
-          ...prev,
-          currentRoom: lastMessage.payload.room,
-          currentRound: lastMessage.payload.currentRound,
-          config: lastMessage.payload.config,
-          playerId: lastMessage.payload.playerId || prev.playerId,
-        }));
+        setGameState(prev => {
+          const room = lastMessage.payload.room;
+          const playerId = lastMessage.payload.playerId || prev.playerId;
+          
+          // Add to joinedRooms if it's a private room and player is not the creator
+          let newJoinedRooms = prev.joinedRooms;
+          if (room.type === 'private' && room.creatorId !== playerId) {
+            // Check if not already in joinedRooms
+            if (!prev.joinedRooms.some(r => r.id === room.id)) {
+              newJoinedRooms = [...prev.joinedRooms, room];
+            }
+          }
+          
+          return {
+            ...prev,
+            currentRoom: room,
+            currentRound: lastMessage.payload.currentRound,
+            config: lastMessage.payload.config,
+            playerId: playerId,
+            joinedRooms: newJoinedRooms,
+          };
+        });
         if (lastMessage.payload.currentRound) {
           setRoundStatus(lastMessage.payload.currentRound.status || 'waiting');
         }
@@ -156,6 +173,10 @@ const App: React.FC = () => {
           currentRoom: null,
           currentRound: null,
           config: null,
+          // Remove from joinedRooms if it was there
+          joinedRooms: lastMessage.payload?.roomId 
+            ? prev.joinedRooms.filter(r => r.id !== lastMessage.payload.roomId)
+            : prev.joinedRooms,
         }));
         setRoundStatus('waiting');
         setWinner(null);
@@ -167,8 +188,9 @@ const App: React.FC = () => {
           currentRoom: null,
           currentRound: null,
           config: null,
-          // Remove the closed room from myRooms
+          // Remove the closed room from myRooms and joinedRooms
           myRooms: prev.myRooms.filter(r => r.id !== lastMessage.payload.roomId),
+          joinedRooms: prev.joinedRooms.filter(r => r.id !== lastMessage.payload.roomId),
         }));
         setRoundStatus('waiting');
         setWinner(null);
@@ -332,6 +354,7 @@ const App: React.FC = () => {
       currentRoom: null,
       availableRooms: [],
       myRooms: [],
+      joinedRooms: [],
     });
   };
 
@@ -446,6 +469,7 @@ const App: React.FC = () => {
             currentRoom={gameState.currentRoom}
             availableRooms={gameState.availableRooms}
             myRooms={gameState.myRooms}
+            joinedRooms={gameState.joinedRooms}
             playerId={gameState.playerId}
             timeRemaining={timeRemaining}
             betAmount={betAmount}
