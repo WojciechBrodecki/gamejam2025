@@ -26,17 +26,20 @@ export const BetPanelTitle = styled.h3`
 
 export const BetControls = styled.div`
   display: flex;
-  flex-wrap: nowrap;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+`;
+
+export const BetControlsRow = styled.div`
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  margin-bottom: 16px;
+  gap: 6px;
+  width: 100%;
 
   @media (min-width: 400px) {
-    gap: 6px;
-  }
-
-  @media (min-width: 768px) {
     gap: 8px;
   }
 `;
@@ -101,44 +104,27 @@ export const BetModifierButton = styled.button<{ $variant?: 'danger' | 'success'
 `;
 
 export const BetInputWrapper = styled.div`
-  flex: 1;
-  min-width: 60px;
-  max-width: 100px;
+  width: 100%;
+  max-width: 200px;
   position: relative;
-
-  @media (min-width: 400px) {
-    min-width: 70px;
-    max-width: 120px;
-  }
-
-  @media (min-width: 768px) {
-    min-width: 80px;
-    max-width: 140px;
-  }
 `;
 
 export const BetInput = styled.input`
   width: 100%;
-  height: 36px;
-  padding: 0 8px;
+  height: 48px;
+  padding: 0 16px;
   background: ${({ theme }) => theme.colors.bgDark};
   border: 2px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radiusSm};
   color: ${({ theme }) => theme.colors.gold};
-  font-size: 1rem;
+  font-size: 1.25rem;
   font-weight: 700;
   text-align: center;
   transition: border-color 0.2s;
 
   @media (min-width: 400px) {
-    height: 42px;
-    font-size: 1.1rem;
-  }
-
-  @media (min-width: 768px) {
-    height: 48px;
-    padding: 0 12px;
-    font-size: 1.25rem;
+    height: 52px;
+    font-size: 1.4rem;
   }
 
   &:focus {

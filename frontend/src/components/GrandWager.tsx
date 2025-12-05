@@ -6,6 +6,15 @@ import { BASE_PATH } from '../config';
 import BetWheel from './BetWheel';
 import BetPanel from './BetPanel';
 
+// Image paths - will be copied to dist/images by webpack
+const getImagePath = () => {
+  const basePath = process.env.NODE_ENV === 'production' ? '/casino' : '';
+  return {
+    lowStake: `${basePath}/images/low_stake.png`,
+    highStake: `${basePath}/images/high_stake.png`,
+  };
+};
+
 // SVG Icons
 const ArrowLeftIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -47,8 +56,121 @@ const RoomsGrid = styled.div`
   gap: 12px;
 
   @media (min-width: 500px) {
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
     gap: 16px;
+  }
+`;
+
+// Public Room Card with background image
+const PublicRoomCard = styled.div<{ $bgImage: string }>`
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: ${({ theme }) => theme.radius};
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+  background-image: url(${props => props.$bgImage});
+  background-size: cover;
+  background-position: center;
+  
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.3) 0%,
+      rgba(0, 0, 0, 0.1) 40%,
+      rgba(0, 0, 0, 0.6) 100%
+    );
+    z-index: 1;
+  }
+`;
+
+const RoomNameNotch = styled.div`
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 0 0 12px 12px;
+  padding: 6px 16px;
+  z-index: 2;
+  border: 1px solid ${({ theme }) => theme.colors.gold};
+  border-top: none;
+`;
+
+const RoomNameNotchText = styled.div`
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: ${({ theme }) => theme.colors.gold};
+  text-align: center;
+  white-space: nowrap;
+
+  @media (min-width: 768px) {
+    font-size: 0.95rem;
+  }
+`;
+
+const RoomInfoBar = styled.div`
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.85);
+  padding: 10px 12px;
+  z-index: 2;
+  border-top: 1px solid ${({ theme }) => theme.colors.border};
+`;
+
+const RoomInfoStats = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  color: ${({ theme }) => theme.colors.textDim};
+  margin-bottom: 8px;
+
+  @media (min-width: 768px) {
+    font-size: 0.8rem;
+  }
+`;
+
+const RoomInfoStat = styled.span`
+  display: flex;
+  align-items: center;
+  gap: 3px;
+`;
+
+const RoomJoinButton = styled.button`
+  width: 100%;
+  padding: 8px;
+  background: linear-gradient(135deg, ${({ theme }) => theme.colors.gold} 0%, ${({ theme }) => theme.colors.goldDim} 100%);
+  color: ${({ theme }) => theme.colors.bgDark};
+  border: none;
+  border-radius: ${({ theme }) => theme.radiusSm};
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  
+  &:hover {
+    filter: brightness(1.1);
+  }
+
+  @media (min-width: 768px) {
+    padding: 10px;
+    font-size: 0.85rem;
   }
 `;
 
@@ -650,6 +772,17 @@ const GrandWager: React.FC<GrandWagerProps> = ({
   }
 
   // Dashboard - no room selected
+  const images = getImagePath();
+  
+  // Helper to determine background image based on room name
+  const getRoomBackground = (roomName: string): string => {
+    const lowerName = roomName.toLowerCase();
+    if (lowerName.includes('high') || lowerName.includes('wysok')) {
+      return images.highStake;
+    }
+    return images.lowStake;
+  };
+
   return (
     <GrandWagerWrapper>
       {publicRooms.length === 0 ? (
@@ -659,15 +792,23 @@ const GrandWager: React.FC<GrandWagerProps> = ({
       ) : (
         <RoomsGrid>
           {publicRooms.map(room => (
-            <RoomCard key={room.id} onClick={() => onRoomJoin(room.id)}>
-              <RoomName>{room.name}</RoomName>
-              <RoomStats>
-                <RoomStat>🎲 {room.currentBetterCount || 0}/{room.maxPlayers} graczy</RoomStat>
-                <RoomStat>💰 ${room.minBet}-${room.maxBet}</RoomStat>
-                <RoomStat>⏱️ {room.roundDurationMs / 1000}s</RoomStat>
-              </RoomStats>
-              <JoinButton>Dołącz do gry</JoinButton>
-            </RoomCard>
+            <PublicRoomCard 
+              key={room.id} 
+              $bgImage={getRoomBackground(room.name)}
+              onClick={() => onRoomJoin(room.id)}
+            >
+              <RoomNameNotch>
+                <RoomNameNotchText>{room.name}</RoomNameNotchText>
+              </RoomNameNotch>
+              <RoomInfoBar>
+                <RoomInfoStats>
+                  <RoomInfoStat>🎲 {room.currentBetterCount || 0}/{room.maxPlayers}</RoomInfoStat>
+                  <RoomInfoStat>💰 ${room.minBet}-${room.maxBet}</RoomInfoStat>
+                  <RoomInfoStat>⏱️ {room.roundDurationMs / 1000}s</RoomInfoStat>
+                </RoomInfoStats>
+                <RoomJoinButton>Dołącz do gry</RoomJoinButton>
+              </RoomInfoBar>
+            </PublicRoomCard>
           ))}
         </RoomsGrid>
       )}

@@ -51,6 +51,7 @@ interface Winner {
   amount: number;
   winningNumber: number;
   avatar?: string | null;
+  totalPool?: number;
 }
 
 interface BetWheelProps {
@@ -91,6 +92,17 @@ const BetWheel: React.FC<BetWheelProps> = ({
   // Ref do śledzenia czy już obsłużyliśmy tego winnera
   const lastWinnerIdRef = useRef<string | null>(null);
   const animationRef = useRef<number | null>(null);
+  
+  // Ref do przechowywania ostatnich niepustych bets (dla przypadku gdy ROUND_WAITING przychodzi przed animacją)
+  const lastValidBetsRef = useRef<{bets: Bet[], totalPool: number}>({bets: [], totalPool: 0});
+  
+  // Zapisuj ostatnie niepuste bets - ale NIE resetuj ich aż do końca animacji
+  useEffect(() => {
+    // Zapisuj tylko jeśli nie jesteśmy w trakcie animacji
+    if (bets.length > 0 && totalPool > 0 && !isSpinning && !showWinnerPopup) {
+      lastValidBetsRef.current = {bets: [...bets], totalPool};
+    }
+  }, [bets, totalPool, isSpinning, showWinnerPopup]);
 
   // Agreguj zakłady per gracz - używaj displayBets podczas animacji
   const activeBets = isSpinning || showWinnerPopup ? displayBets : bets;
@@ -130,6 +142,8 @@ const BetWheel: React.FC<BetWheelProps> = ({
 
   // Główna logika animacji - reaguj na nowego winnera
   useEffect(() => {
+    console.log('[BetWheel] useEffect triggered, winner:', winner ? 'yes' : 'no', 'lastWinnerIdRef:', lastWinnerIdRef.current);
+    
     if (!winner) {
       // Reset gdy winner zniknie
       lastWinnerIdRef.current = null;
@@ -139,25 +153,46 @@ const BetWheel: React.FC<BetWheelProps> = ({
     // Unikalna identyfikacja winnera
     const winnerId = `${winner.playerId}-${winner.winningNumber}`;
     
+    console.log('[BetWheel] Checking winnerId:', winnerId, 'vs lastWinnerIdRef:', lastWinnerIdRef.current);
+    
     // Jeśli już obsłużyliśmy tego winnera, nic nie rób
     if (lastWinnerIdRef.current === winnerId) {
+      console.log('[BetWheel] Already handled this winner, skipping');
       return;
     }
     
-    // Sprawdź czy mamy dane do animacji
-    if (bets.length === 0 || totalPool === 0) {
+    // Użyj aktualnych bets jeśli są dostępne, lub ostatnich zapisanych
+    const sourceBets = bets.length > 0 ? bets : lastValidBetsRef.current.bets;
+    // Użyj totalPool z winner jeśli jest dostępny (najbardziej wiarygodne), potem aktualne, potem zapisane
+    const sourcePool = winner.totalPool || (totalPool > 0 ? totalPool : lastValidBetsRef.current.totalPool);
+    
+    console.log('[BetWheel] Winner received:', { 
+      winnerId, 
+      'winner.totalPool': winner.totalPool, 
+      totalPool, 
+      'lastValidBetsRef.totalPool': lastValidBetsRef.current.totalPool,
+      sourcePool,
+      'bets.length': bets.length,
+      'sourceBets.length': sourceBets.length
+    });
+    
+    // Sprawdź czy mamy dane do animacji - potrzebujemy tylko totalPool (bets są opcjonalne dla wizualizacji)
+    if (sourcePool === 0) {
+      console.warn('[BetWheel] No totalPool available for animation, skipping');
       return;
     }
     lastWinnerIdRef.current = winnerId;
+    
+    console.log('[BetWheel] Starting animation for winner:', winnerId);
 
-    // Zamroź dane
-    setDisplayBets([...bets]);
-    setDisplayPool(totalPool);
+    // Zamroź dane - jeśli nie mamy bets, użyj pustej tablicy (koło będzie puste ale animacja zadziała)
+    setDisplayBets([...sourceBets]);
+    setDisplayPool(sourcePool);
 
     // Oblicz dane o zwycięzcy
     const byPlayer: Record<string, AggregatedBet> = {};
     let otherColorIdx = 0;
-    bets.forEach((bet) => {
+    sourceBets.forEach((bet) => {
       if (!byPlayer[bet.playerId]) {
         const isCurrentPlayer = bet.playerId === currentPlayerId;
         const color = isCurrentPlayer 
@@ -174,7 +209,7 @@ const BetWheel: React.FC<BetWheelProps> = ({
       byPlayer[bet.playerId].totalAmount += bet.amount;
     });
     Object.values(byPlayer).forEach(player => {
-      player.percent = totalPool > 0 ? (player.totalAmount / totalPool) * 100 : 0;
+      player.percent = sourcePool > 0 ? (player.totalAmount / sourcePool) * 100 : 0;
     });
     
     const winnerPlayer = byPlayer[winner.playerId];
@@ -192,7 +227,7 @@ const BetWheel: React.FC<BetWheelProps> = ({
     }
 
     // Oblicz docelowy kąt
-    const winningAngle = (winner.winningNumber / totalPool) * 360;
+    const winningAngle = (winner.winningNumber / sourcePool) * 360;
     const spins = 3; // 3 pełne obroty
     
     // Normalizuj aktualną rotację do 0-360
@@ -208,12 +243,15 @@ const BetWheel: React.FC<BetWheelProps> = ({
     // Dodaj pełne obroty + dodatkową rotację do osiągnięcia celu
     const targetRotation = rotation + (spins * 360) + additionalRotation;
 
+    console.log('[BetWheel] Animation params:', { winningAngle, currentNormalizedRotation, finalAngle, additionalRotation, targetRotation, currentRotation: rotation });
+
     // Animacja kręcenia - 1 obrót na sekundę = 5 sekund na 5 obrotów
     const duration = 2000; // 2 sekundy
     const startTime = Date.now();
     const startRotation = rotation;
 
     setIsSpinning(true);
+    console.log('[BetWheel] setIsSpinning(true) called');
 
     const animate = () => {
       const elapsed = Date.now() - startTime;
@@ -247,20 +285,26 @@ const BetWheel: React.FC<BetWheelProps> = ({
     };
   }, [winner, bets, totalPool]);
 
-  // Wywołaj callback po pokazaniu winnera
+  // Funkcja do zamykania popup winnera
+  const closeWinnerPopup = () => {
+    setShowWinnerPopup(false);
+    setDisplayBets([]);
+    setDisplayPool(0);
+    setWinnerData(null);
+    setRotation(0); // Reset koła do pozycji początkowej
+    lastValidBetsRef.current = {bets: [], totalPool: 0}; // Reset cached bets
+    onWinnerShown?.();
+  };
+
+  // Wywołaj callback po pokazaniu winnera (auto-zamknięcie po 3s)
   useEffect(() => {
     if (showWinnerPopup && winner) {
       const timeout = setTimeout(() => {
-        setShowWinnerPopup(false);
-        setDisplayBets([]);
-        setDisplayPool(0);
-        setWinnerData(null);
-        setRotation(0); // Reset koła do pozycji początkowej
-        onWinnerShown?.();
+        closeWinnerPopup();
       }, 3000);
       return () => clearTimeout(timeout);
     }
-  }, [showWinnerPopup, winner, onWinnerShown]);
+  }, [showWinnerPopup, winner]);
 
   const formatTime = (ms: number): string => {
     const seconds = Math.floor(ms / 1000);
@@ -426,7 +470,7 @@ const BetWheel: React.FC<BetWheelProps> = ({
         </TimerCenter>
 
         {showWinnerPopup && winner && winnerData && (
-          <WinnerOverlay>
+          <WinnerOverlay onClick={closeWinnerPopup} style={{ cursor: 'pointer' }}>
             <WinnerIcon $color={winnerData.color}>
               <WinnerAvatar 
                 src={`${API_BASE_URL}/api/players/${winner.playerId}/avatar`} 

@@ -3,6 +3,7 @@ import {
   BetPanelWrapper,
   BetPanelTitle,
   BetControls,
+  BetControlsRow,
   BetModifierButton,
   BetInputWrapper,
   BetInput,
@@ -98,28 +99,40 @@ const BetPanel: React.FC<BetPanelProps> = ({
       <BetPanelTitle>Postaw zakład (${minBet} - ${effectiveMaxBet})</BetPanelTitle>
       
       <BetControls>
-        <BetModifierButton
-          onClick={() => modifyBet('half')}
-          disabled={currentBet <= minBet}
-          $variant="danger"
-        >
-          /2
-        </BetModifierButton>
-        
-        <BetModifierButton
-          onClick={() => modifyBet('minusLarge')}
-          disabled={currentBet <= minBet}
-        >
-          -{formatStep(largeStep)}
-        </BetModifierButton>
-        
-        <BetModifierButton
-          onClick={() => modifyBet('minusSmall')}
-          disabled={currentBet <= minBet}
-        >
-          -{formatStep(smallStep)}
-        </BetModifierButton>
-        
+        {/* Górny rząd - przyciski zwiększające */}
+        <BetControlsRow>
+          <BetModifierButton
+            onClick={() => modifyBet('double')}
+            disabled={currentBet * 2 > effectiveMaxBet || currentBet === 0}
+            $variant="success"
+          >
+            x2
+          </BetModifierButton>
+          
+          <BetModifierButton
+            onClick={() => modifyBet('plusLarge')}
+            disabled={currentBet >= effectiveMaxBet}
+          >
+            +{formatStep(largeStep)}
+          </BetModifierButton>
+          
+          <BetModifierButton
+            onClick={() => modifyBet('plusSmall')}
+            disabled={currentBet >= effectiveMaxBet}
+          >
+            +{formatStep(smallStep)}
+          </BetModifierButton>
+          
+          <BetModifierButton
+            onClick={() => modifyBet('max')}
+            disabled={currentBet >= effectiveMaxBet}
+            $variant="success"
+          >
+            MAX
+          </BetModifierButton>
+        </BetControlsRow>
+
+        {/* Środkowy rząd - input */}
         <BetInputWrapper>
           <BetInput
             type="text"
@@ -128,28 +141,39 @@ const BetPanel: React.FC<BetPanelProps> = ({
             placeholder={minBet.toString()}
           />
         </BetInputWrapper>
-        
-        <BetModifierButton
-          onClick={() => modifyBet('plusSmall')}
-          disabled={currentBet >= effectiveMaxBet}
-        >
-          +{formatStep(smallStep)}
-        </BetModifierButton>
-        
-        <BetModifierButton
-          onClick={() => modifyBet('plusLarge')}
-          disabled={currentBet >= effectiveMaxBet}
-        >
-          +{formatStep(largeStep)}
-        </BetModifierButton>
-        
-        <BetModifierButton
-          onClick={() => modifyBet('double')}
-          disabled={currentBet * 2 > effectiveMaxBet || currentBet === 0}
-          $variant="success"
-        >
-          x2
-        </BetModifierButton>
+
+        {/* Dolny rząd - przyciski zmniejszające */}
+        <BetControlsRow>
+          <BetModifierButton
+            onClick={() => modifyBet('half')}
+            disabled={currentBet <= minBet}
+            $variant="danger"
+          >
+            /2
+          </BetModifierButton>
+          
+          <BetModifierButton
+            onClick={() => modifyBet('minusLarge')}
+            disabled={currentBet <= minBet}
+          >
+            -{formatStep(largeStep)}
+          </BetModifierButton>
+          
+          <BetModifierButton
+            onClick={() => modifyBet('minusSmall')}
+            disabled={currentBet <= minBet}
+          >
+            -{formatStep(smallStep)}
+          </BetModifierButton>
+          
+          <BetModifierButton
+            onClick={() => modifyBet('min')}
+            disabled={currentBet <= minBet}
+            $variant="danger"
+          >
+            MIN
+          </BetModifierButton>
+        </BetControlsRow>
       </BetControls>
 
       <PlaceBetButton

@@ -1,6 +1,6 @@
 // API Configuration
 // Base path for production deployment under /casino/
-export const BASE_PATH = process.env.NODE_ENV === 'production' ? '/casino' : '';
+export const BASE_PATH = process.env.NODE_ENV === 'production' ? '/casino/' : '';
 
 export const API_BASE_URL = process.env.NODE_ENV === 'production' 
   ? BASE_PATH

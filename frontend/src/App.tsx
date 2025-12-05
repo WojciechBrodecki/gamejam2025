@@ -54,7 +54,7 @@ const App: React.FC = () => {
   
   const [betAmount, setBetAmount] = useState<string>('10');
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
-  const [winner, setWinner] = useState<{ playerId: string; username: string; amount: number; winningNumber: number; avatar?: string | null } | null>(null);
+  const [winner, setWinner] = useState<{ playerId: string; username: string; amount: number; winningNumber: number; avatar?: string | null; totalPool?: number } | null>(null);
   const [roundStatus, setRoundStatus] = useState<'waiting' | 'active' | 'finished'>('waiting');
   const [pendingRoomCode, setPendingRoomCode] = useState<string | null>(null);
 
@@ -145,6 +145,10 @@ const App: React.FC = () => {
         if (lastMessage.payload.currentRound) {
           setRoundStatus(lastMessage.payload.currentRound.status || 'waiting');
         }
+        // Set initial bet to room's minBet
+        if (lastMessage.payload.config?.minBet) {
+          setBetAmount(lastMessage.payload.config.minBet.toString());
+        }
         // Only show toast for private rooms
         if (lastMessage.payload.room.type === 'private') {
           toast.success(`Dołączono do pokoju: ${lastMessage.payload.room.name}`);
@@ -163,6 +167,10 @@ const App: React.FC = () => {
         }));
         if (lastMessage.payload.currentRound) {
           setRoundStatus(lastMessage.payload.currentRound.status || 'waiting');
+        }
+        // Set initial bet to room's minBet
+        if (lastMessage.payload.config?.minBet) {
+          setBetAmount(lastMessage.payload.config.minBet.toString());
         }
         toast.success(`Utworzono pokój: ${lastMessage.payload.room.name}`);
         break;
@@ -241,6 +249,10 @@ const App: React.FC = () => {
           availableRooms: lastMessage.payload.availableRooms || [],
         }));
         
+        // Set initial bet to room's minBet
+        if (lastMessage.payload.currentRoom?.config?.minBet) {
+          setBetAmount(lastMessage.payload.currentRoom.config.minBet.toString());
+        }
         // Fetch player data from API
         if (lastMessage.payload.playerId) {
           fetchPlayerData(lastMessage.payload.playerId);
@@ -276,6 +288,11 @@ const App: React.FC = () => {
         break;
 
       case 'ROUND_END':
+        console.log('[App] ROUND_END received:', {
+          winner: lastMessage.payload.winner,
+          winningNumber: lastMessage.payload.winningNumber,
+          'round.totalPool': lastMessage.payload.round?.totalPool,
+        });
         setRoundStatus('finished');
         setWinner({
           playerId: lastMessage.payload.winner.playerId,
@@ -283,6 +300,7 @@ const App: React.FC = () => {
           amount: lastMessage.payload.winner.amountWon,
           winningNumber: lastMessage.payload.winningNumber,
           avatar: lastMessage.payload.winner.avatar,
+          totalPool: lastMessage.payload.round?.totalPool,
         });
         // Refresh player balance after round end (might have won)
         if (gameState.playerId) {
@@ -292,6 +310,14 @@ const App: React.FC = () => {
 
       case 'ROUND_RESULT_NOTIFICATION':
         // Personal notification about round result (for players who placed bets)
+        // Don't show notification for the room user is currently viewing
+        if (lastMessage.payload.roomId === gameState.currentRoom?.id) {
+          // Update player balance from notification (silently)
+          if (player && lastMessage.payload.currentBalance !== undefined) {
+            setPlayer({ ...player, balance: lastMessage.payload.currentBalance });
+          }
+          break;
+        }
         const { isWinner, netResult, roomName, winnerUsername, currentBalance } = lastMessage.payload;
         if (isWinner) {
           toast.success(`🏆 Wygrałeś ${netResult}$ w pokoju ${roomName}!`);
