@@ -228,6 +228,12 @@ const App: React.FC = () => {
         break;
 
       case 'ROUND_WAITING':
+        // WAŻNE: Nie aktualizuj currentRound gdy jest aktywny winner (animacja koła w toku)
+        // To zapobiega utracie danych potrzebnych do animacji
+        if (winner) {
+          console.log('[App] ROUND_WAITING received but winner animation active - ignoring');
+          break;
+        }
         setRoundStatus('waiting');
         setGameState(prev => ({
           ...prev,
@@ -260,6 +266,11 @@ const App: React.FC = () => {
         break;
 
       case 'ROUND_START':
+        // Ignoruj jeśli animacja winnera jest w toku
+        if (winner) {
+          console.log('[App] ROUND_START received but winner animation active - ignoring');
+          break;
+        }
         setRoundStatus('active');
         setGameState(prev => ({
           ...prev,
@@ -269,6 +280,11 @@ const App: React.FC = () => {
         break;
 
       case 'ROUND_UPDATE':
+        // Ignoruj jeśli animacja winnera jest w toku
+        if (winner) {
+          console.log('[App] ROUND_UPDATE received but winner animation active - ignoring');
+          break;
+        }
         setGameState(prev => ({
           ...prev,
           currentRound: lastMessage.payload.round,

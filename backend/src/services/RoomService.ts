@@ -612,6 +612,7 @@ export class RoomService {
             playerId: winner.playerId,
             username: winner.playerUsername,
             amountWon: winnerAmount,
+            avatar: winnerPlayer?.avatar || null,
           },
           winningNumber: winner.winningNumber,
         },

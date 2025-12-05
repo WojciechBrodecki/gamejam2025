@@ -109,13 +109,23 @@ const BetWheel: React.FC<BetWheelProps> = ({
   // Ref do przechowywania ostatnich niepustych bets (dla przypadku gdy ROUND_WAITING przychodzi przed animacją)
   const lastValidBetsRef = useRef<{bets: Bet[], totalPool: number}>({bets: [], totalPool: 0});
   
-  // Zapisuj ostatnie niepuste bets - ale NIE resetuj ich aż do końca animacji
+  // Flaga żeby wiedzieć czy mamy aktywnego winnera (przed, w trakcie i po animacji)
+  const hasActiveWinnerRef = useRef(false);
+  
+  // Zapisuj ostatnie niepuste bets - ale NIE gdy jest aktywny winner!
+  // To zapobiega nadpisaniu danych przez ROUND_WAITING który przychodzi po ROUND_END
   useEffect(() => {
-    // Zapisuj tylko jeśli nie jesteśmy w trakcie animacji
-    if (bets.length > 0 && totalPool > 0 && !isSpinning && !showWinnerPopup) {
+    // NIE nadpisuj danych gdy mamy aktywnego winnera (animacja w toku lub czeka na uruchomienie)
+    if (hasActiveWinnerRef.current) {
+      console.log('[BetWheel] Skipping lastValidBetsRef update - winner is active');
+      return;
+    }
+    // Zapisuj tylko gdy mamy niepuste dane
+    if (bets.length > 0 && totalPool > 0) {
+      console.log('[BetWheel] Updating lastValidBetsRef:', { betsLength: bets.length, totalPool });
       lastValidBetsRef.current = {bets: [...bets], totalPool};
     }
-  }, [bets, totalPool, isSpinning, showWinnerPopup]);
+  }, [bets, totalPool]);
 
   // Agreguj zakłady per gracz - używaj displayBets podczas animacji
   const activeBets = isSpinning || showWinnerPopup ? displayBets : bets;
@@ -161,6 +171,8 @@ const BetWheel: React.FC<BetWheelProps> = ({
       // NIE resetuj lastWinnerIdRef gdy winner zniknie - to zapobiega ponownemu uruchomieniu animacji
       // jeśli winner wróci (np. przez re-render)
       console.log('[BetWheel] No winner, keeping lastWinnerIdRef:', lastWinnerIdRef.current);
+      // Reset flagi aktywnego winnera gdy winner jest null
+      hasActiveWinnerRef.current = false;
       return;
     }
 
@@ -175,6 +187,9 @@ const BetWheel: React.FC<BetWheelProps> = ({
       return;
     }
     
+    // NATYCHMIAST oznacz że mamy aktywnego winnera - zapobiega nadpisaniu danych przez ROUND_WAITING
+    hasActiveWinnerRef.current = true;
+    
     // NATYCHMIAST oznacz że obsługujemy tego winnera - zapobiega race condition
     lastWinnerIdRef.current = winnerId;
     console.log('[BetWheel] Marked winnerId as handled:', winnerId);
@@ -185,12 +200,19 @@ const BetWheel: React.FC<BetWheelProps> = ({
       return;
     }
     
-    // Użyj aktualnych bets jeśli są dostępne, lub ostatnich zapisanych
+    // WAŻNE: Kolejność priorytetów dla totalPool:
+    // 1. winner.totalPool - najważniejsze, pochodzi bezpośrednio z ROUND_END
+    // 2. lastValidBetsRef - zapisane wcześniej dane, zanim ROUND_WAITING je zresetował
+    // 3. currentTotalPoolRef - aktualne props (mogą być już zresetowane przez ROUND_WAITING)
     const currentBets = currentBetsRef.current;
     const currentPool = currentTotalPoolRef.current;
-    const sourceBets = currentBets.length > 0 ? currentBets : lastValidBetsRef.current.bets;
-    // Użyj totalPool z winner jeśli jest dostępny (najbardziej wiarygodne), potem aktualne, potem zapisane
-    const sourcePool = winner.totalPool || (currentPool > 0 ? currentPool : lastValidBetsRef.current.totalPool);
+    
+    // Priorytet dla totalPool: winner.totalPool > lastValidBetsRef > currentPool
+    const sourcePool = winner.totalPool || lastValidBetsRef.current.totalPool || currentPool;
+    // Priorytet dla bets: lastValidBetsRef (pewne że mają dane) > currentBets (mogą być puste)
+    const sourceBets = lastValidBetsRef.current.bets.length > 0 
+      ? lastValidBetsRef.current.bets 
+      : currentBets;
     
     console.log('[BetWheel] Winner received:', { 
       winnerId, 
@@ -199,20 +221,26 @@ const BetWheel: React.FC<BetWheelProps> = ({
       'lastValidBetsRef.totalPool': lastValidBetsRef.current.totalPool,
       sourcePool,
       'currentBets.length': currentBets.length,
+      'lastValidBetsRef.bets.length': lastValidBetsRef.current.bets.length,
       'sourceBets.length': sourceBets.length
     });
     
-    // Sprawdź czy mamy dane do animacji - potrzebujemy tylko totalPool (bets są opcjonalne dla wizualizacji)
-    if (sourcePool === 0) {
+    // Sprawdź czy mamy dane do animacji
+    // ZAWSZE uruchom animację jeśli winner.totalPool jest dostępny (to najbardziej wiarygodne źródło)
+    if (sourcePool === 0 && !winner.totalPool) {
       console.warn('[BetWheel] No totalPool available for animation, skipping');
+      hasActiveWinnerRef.current = false; // Reset flagi bo nie będzie animacji
       return;
     }
     
-    console.log('[BetWheel] Starting animation for winner:', winnerId);
+    // Jeśli mamy winner.totalPool ale sourcePool jest 0, użyj winner.totalPool
+    const finalPool = sourcePool > 0 ? sourcePool : (winner.totalPool || 1);
+    
+    console.log('[BetWheel] Starting animation for winner:', winnerId, 'finalPool:', finalPool);
 
-    // Zamroź dane - jeśli nie mamy bets, użyj pustej tablicy (koło będzie puste ale animacja zadziała)
+    // Zamroź dane - użyj finalPool dla prawidłowej animacji
     setDisplayBets([...sourceBets]);
-    setDisplayPool(sourcePool);
+    setDisplayPool(finalPool);
 
     // Oblicz dane o zwycięzcy
     const byPlayer: Record<string, AggregatedBet> = {};
@@ -234,7 +262,7 @@ const BetWheel: React.FC<BetWheelProps> = ({
       byPlayer[bet.playerId].totalAmount += bet.amount;
     });
     Object.values(byPlayer).forEach(player => {
-      player.percent = sourcePool > 0 ? (player.totalAmount / sourcePool) * 100 : 0;
+      player.percent = finalPool > 0 ? (player.totalAmount / finalPool) * 100 : 0;
     });
     
     const winnerPlayer = byPlayer[winner.playerId];
@@ -251,8 +279,8 @@ const BetWheel: React.FC<BetWheelProps> = ({
       });
     }
 
-    // Oblicz docelowy kąt
-    const winningAngle = (winner.winningNumber / sourcePool) * 360;
+    // Oblicz docelowy kąt - używamy finalPool dla poprawnego obliczenia
+    const winningAngle = (winner.winningNumber / finalPool) * 360;
     const spins = 3; // 3 pełne obroty
     
     // Użyj ref dla aktualnej rotacji (nie stare closure)
@@ -324,6 +352,7 @@ const BetWheel: React.FC<BetWheelProps> = ({
     rotationRef.current = 0; // Reset ref
     animationRef.current = null; // Reset animation ref
     lastWinnerIdRef.current = null; // Reset winner ref - pozwala na animację następnego winnera
+    hasActiveWinnerRef.current = false; // Reset flagi aktywnego winnera
     lastValidBetsRef.current = {bets: [], totalPool: 0}; // Reset cached bets
     console.log('[BetWheel] closeWinnerPopup - all refs reset');
     onWinnerShown?.();
