@@ -7,12 +7,16 @@ export const GlobalStyles = createGlobalStyle`
     box-sizing: border-box;
   }
 
+  html, body {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: ${({ theme }) => theme.colors.bgDark};
     color: ${({ theme }) => theme.colors.text};
     min-height: 100vh;
-    overflow-x: hidden;
   }
 
   ::-webkit-scrollbar {

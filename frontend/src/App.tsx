@@ -336,7 +336,6 @@ const App: React.FC = () => {
     }
     
     setIsLoggedIn(true);
-    toast.success('Zalogowano pomyślnie!');
   };
 
   const handleLogout = () => {

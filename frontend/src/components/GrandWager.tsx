@@ -544,39 +544,44 @@ const GrandWager: React.FC<GrandWagerProps> = ({
           <ArrowLeftIcon />
         </BackButton>
         
-        <MenuButton onClick={() => setShowMenu(!showMenu)}>
-          <MoreIcon />
-        </MenuButton>
-        
-        {showMenu && (
+        {/* Menu only for private rooms */}
+        {currentRoom.type === 'private' && (
           <>
-            <MenuOverlay onClick={() => setShowMenu(false)} />
-            <MenuDropdown>
-              {currentRoom.inviteCode && (
-                <MenuItem onClick={() => { setShowQRModal(true); setShowMenu(false); }}>
-                  <ShareIcon /> Zaproś
-                </MenuItem>
-              )}
-              {isCreator ? (
-                <MenuItem 
-                  $danger 
-                  $disabled={hasActiveBets}
-                  onClick={() => {
-                    if (!hasActiveBets) {
-                      onRoomClose(currentRoom.id);
-                      setShowMenu(false);
-                    }
-                  }}
-                  title={hasActiveBets ? 'Nie można usunąć - gracze są w puli' : ''}
-                >
-                  ✖ Usuń pokój {hasActiveBets && '(gracze w puli)'}
-                </MenuItem>
-              ) : (
-                <MenuItem $danger onClick={() => { onRoomLeave(); setShowMenu(false); }}>
-                  ← Opuść pokój
-                </MenuItem>
-              )}
-            </MenuDropdown>
+            <MenuButton onClick={() => setShowMenu(!showMenu)}>
+              <MoreIcon />
+            </MenuButton>
+            
+            {showMenu && (
+              <>
+                <MenuOverlay onClick={() => setShowMenu(false)} />
+                <MenuDropdown>
+                  {currentRoom.inviteCode && (
+                    <MenuItem onClick={() => { setShowQRModal(true); setShowMenu(false); }}>
+                      <ShareIcon /> Zaproś
+                    </MenuItem>
+                  )}
+                  {isCreator ? (
+                    <MenuItem 
+                      $danger 
+                      $disabled={hasActiveBets}
+                      onClick={() => {
+                        if (!hasActiveBets) {
+                          onRoomClose(currentRoom.id);
+                          setShowMenu(false);
+                        }
+                      }}
+                      title={hasActiveBets ? 'Nie można usunąć - gracze są w puli' : ''}
+                    >
+                      ✖ Usuń pokój {hasActiveBets && '(gracze w puli)'}
+                    </MenuItem>
+                  ) : (
+                    <MenuItem $danger onClick={() => { onRoomLeave(); setShowMenu(false); }}>
+                      ← Opuść pokój
+                    </MenuItem>
+                  )}
+                </MenuDropdown>
+              </>
+            )}
           </>
         )}
 

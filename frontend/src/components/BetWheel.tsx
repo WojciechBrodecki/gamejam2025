@@ -123,7 +123,9 @@ const BetWheel: React.FC<BetWheelProps> = ({
       player.percent = activePool > 0 ? (player.totalAmount / activePool) * 100 : 0;
     });
 
-    return Object.values(byPlayer).sort((a, b) => b.totalAmount - a.totalAmount);
+    // Nie sortujemy - zachowujemy kolejność w jakiej gracze obstawiali
+    // żeby była zgodna z kolejnością w jakiej backend liczy winningNumber
+    return Object.values(byPlayer);
   }, [activeBets, activePool, currentPlayerId]);
 
   // Główna logika animacji - reaguj na nowego winnera

@@ -3,10 +3,17 @@ import styled from 'styled-components';
 export const BetPanelWrapper = styled.div`
   background: ${({ theme }) => theme.colors.bgCard};
   border-radius: ${({ theme }) => theme.radius};
-  padding: 20px;
+  padding: 16px;
   border: 1px solid ${({ theme }) => theme.colors.border};
   max-width: 400px;
+  width: 100%;
   margin: 0 auto;
+  box-sizing: border-box;
+  overflow: hidden;
+
+  @media (min-width: 400px) {
+    padding: 20px;
+  }
 `;
 
 export const BetPanelTitle = styled.h3`

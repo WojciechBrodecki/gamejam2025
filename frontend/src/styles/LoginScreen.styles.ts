@@ -329,12 +329,24 @@ export const AvatarPreview = styled.div`
   }
 `;
 
+const pulseGlow = keyframes`
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+`;
+
 export const AvatarPlaceholder = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
   color: ${({ theme }) => theme.colors.textMuted};
+  animation: ${pulseGlow} 2s ease-in-out infinite;
 
   span {
     font-size: 0.65rem;
