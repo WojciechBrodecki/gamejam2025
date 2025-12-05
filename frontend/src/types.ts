@@ -69,6 +69,7 @@ export interface GameState {
   playerId: string | null;
   currentRoom: Room | null;
   availableRooms: Room[];
+  myRooms: Room[]; // Player's own created private rooms
 }
 
 export type WSMessageType = 

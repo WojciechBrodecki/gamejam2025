@@ -48,6 +48,7 @@ const App: React.FC = () => {
     playerId: null,
     currentRoom: null,
     availableRooms: [],
+    myRooms: [],
   });
   
   const [betAmount, setBetAmount] = useState<string>('10');
@@ -106,6 +107,7 @@ const App: React.FC = () => {
             ...prev,
             playerId: lastMessage.payload.playerId || prev.playerId,
             availableRooms: lastMessage.payload.rooms || [],
+            myRooms: lastMessage.payload.myRooms || [],
           }));
           // Fetch player data to get balance
           if (lastMessage.payload.playerId) {
@@ -115,8 +117,7 @@ const App: React.FC = () => {
         break;
 
       case 'ROOM_JOINED':
-      case 'ROOM_CREATED':
-        // Joined/Created a room - update state with room data
+        // Joined a room - update state with room data
         setGameState(prev => ({
           ...prev,
           currentRoom: lastMessage.payload.room,
@@ -133,6 +134,22 @@ const App: React.FC = () => {
         }
         break;
 
+      case 'ROOM_CREATED':
+        // Created a room - update state and add to myRooms
+        setGameState(prev => ({
+          ...prev,
+          currentRoom: lastMessage.payload.room,
+          currentRound: lastMessage.payload.currentRound,
+          config: lastMessage.payload.config,
+          playerId: lastMessage.payload.playerId || prev.playerId,
+          myRooms: [...prev.myRooms, lastMessage.payload.room],
+        }));
+        if (lastMessage.payload.currentRound) {
+          setRoundStatus(lastMessage.payload.currentRound.status || 'waiting');
+        }
+        toast.success(`Utworzono pokój: ${lastMessage.payload.room.name}`);
+        break;
+
       case 'ROOM_LEFT':
         setGameState(prev => ({
           ...prev,
@@ -142,7 +159,6 @@ const App: React.FC = () => {
         }));
         setRoundStatus('waiting');
         setWinner(null);
-        toast.info('Opuszczono pokój');
         break;
 
       case 'ROOM_CLOSED':
@@ -151,6 +167,8 @@ const App: React.FC = () => {
           currentRoom: null,
           currentRound: null,
           config: null,
+          // Remove the closed room from myRooms
+          myRooms: prev.myRooms.filter(r => r.id !== lastMessage.payload.roomId),
         }));
         setRoundStatus('waiting');
         setWinner(null);
@@ -313,6 +331,7 @@ const App: React.FC = () => {
       playerId: null,
       currentRoom: null,
       availableRooms: [],
+      myRooms: [],
     });
   };
 
@@ -426,6 +445,7 @@ const App: React.FC = () => {
             config={gameState.config}
             currentRoom={gameState.currentRoom}
             availableRooms={gameState.availableRooms}
+            myRooms={gameState.myRooms}
             playerId={gameState.playerId}
             timeRemaining={timeRemaining}
             betAmount={betAmount}

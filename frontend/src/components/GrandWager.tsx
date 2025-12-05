@@ -5,6 +5,22 @@ import { Player, RoomConfig, Round, Room } from '../types';
 import BetWheel from './BetWheel';
 import BetPanel from './BetPanel';
 
+// SVG Icons
+const ArrowLeftIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 12H5" />
+    <path d="M12 19l-7-7 7-7" />
+  </svg>
+);
+
+const ShareIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" />
+    <polyline points="16 6 12 2 8 6" />
+    <line x1="12" y1="2" x2="12" y2="15" />
+  </svg>
+);
+
 const GrandWagerWrapper = styled.div`
   display: flex;
   flex-direction: column;
@@ -12,43 +28,26 @@ const GrandWagerWrapper = styled.div`
   max-width: 600px;
   margin: 0 auto;
   padding: 0 16px;
+  position: relative;
 `;
 
 // Dashboard styles
-const DashboardTitle = styled.h2`
-  text-align: center;
-  color: ${({ theme }) => theme.colors.gold};
-  font-size: 1.8rem;
-  margin-bottom: 8px;
-`;
-
-const DashboardSubtitle = styled.p`
-  text-align: center;
-  color: ${({ theme }) => theme.colors.textDim};
-  margin-bottom: 24px;
-`;
-
-const SectionTitle = styled.h3`
-  color: ${({ theme }) => theme.colors.text};
-  font-size: 1.1rem;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-`;
-
 const RoomsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: 1fr;
+  gap: 12px;
+
+  @media (min-width: 500px) {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
 `;
 
 const RoomCard = styled.div<{ $active?: boolean }>`
   background: ${({ theme, $active }) => $active ? 'rgba(240, 192, 32, 0.15)' : theme.colors.bgCard};
   border: 2px solid ${({ theme, $active }) => $active ? theme.colors.gold : 'transparent'};
   border-radius: ${({ theme }) => theme.radius};
-  padding: 16px;
+  padding: 12px;
   cursor: pointer;
   transition: all 0.2s;
   
@@ -56,25 +55,40 @@ const RoomCard = styled.div<{ $active?: boolean }>`
     background: ${({ theme }) => theme.colors.bgHover};
     transform: translateY(-2px);
   }
+
+  @media (min-width: 768px) {
+    padding: 16px;
+  }
 `;
 
 const RoomName = styled.div`
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
+  text-align: center;
   color: ${({ theme }) => theme.colors.text};
   margin-bottom: 8px;
   display: flex;
-  align-items: center;
+  justify-content: center;
   gap: 8px;
+
+  @media (min-width: 768px) {
+    font-size: 1.1rem;
+  }
 `;
 
 const RoomStats = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  font-size: 0.85rem;
+  gap: 8px;
+  font-size: 0.75rem;
+  justify-content: center;
   color: ${({ theme }) => theme.colors.textDim};
   margin-bottom: 12px;
+
+  @media (min-width: 768px) {
+    gap: 12px;
+    font-size: 0.85rem;
+  }
 `;
 
 const RoomStat = styled.span`
@@ -83,27 +97,63 @@ const RoomStat = styled.span`
   gap: 4px;
 `;
 
+const Divider = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0;
+`;
+
+const DividerLine = styled.div`
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, transparent, ${({ theme }) => theme.colors.border}, transparent);
+`;
+
+const DividerText = styled.span`
+  color: ${({ theme }) => theme.colors.gold};
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  white-space: nowrap;
+
+  @media (min-width: 768px) {
+    font-size: 0.85rem;
+    letter-spacing: 2px;
+  }
+`;
+
 const JoinButton = styled.button`
   width: 100%;
-  padding: 10px;
+  padding: 8px;
   background: ${({ theme }) => theme.colors.gold};
   color: ${({ theme }) => theme.colors.bgDark};
   border: none;
   border-radius: ${({ theme }) => theme.radiusSm};
   font-weight: 600;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.2s;
   
   &:hover {
     filter: brightness(1.1);
   }
+
+  @media (min-width: 768px) {
+    padding: 10px;
+    font-size: 0.9rem;
+  }
 `;
 
 const JoinCodeSection = styled.div`
   background: ${({ theme }) => theme.colors.bgCard};
   border-radius: ${({ theme }) => theme.radius};
-  padding: 16px;
-  margin-bottom: 24px;
+  padding: 12px;
+
+  @media (min-width: 768px) {
+    padding: 16px;
+  }
 `;
 
 const JoinCodeRow = styled.div`
@@ -113,12 +163,13 @@ const JoinCodeRow = styled.div`
 
 const JoinCodeInput = styled.input`
   flex: 1;
-  padding: 12px;
+  min-width: 0;
+  padding: 10px 12px;
   background: ${({ theme }) => theme.colors.bgDark};
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radiusSm};
   color: ${({ theme }) => theme.colors.text};
-  font-size: 1rem;
+  font-size: 0.9rem;
   text-transform: uppercase;
   letter-spacing: 2px;
   
@@ -127,24 +178,32 @@ const JoinCodeInput = styled.input`
     text-transform: none;
     letter-spacing: normal;
   }
+
+  @media (min-width: 768px) {
+    padding: 12px;
+    font-size: 1rem;
+  }
 `;
 
 const CreateRoomSection = styled.div`
   background: ${({ theme }) => theme.colors.bgCard};
   border-radius: ${({ theme }) => theme.radius};
-  padding: 16px;
-  margin-bottom: 24px;
+  padding: 12px;
+
+  @media (min-width: 768px) {
+    padding: 16px;
+  }
 `;
 
 const CreateRoomButton = styled.button`
   width: 100%;
-  padding: 14px;
+  padding: 12px;
   background: linear-gradient(135deg, #2ecc71, #27ae60);
   color: white;
   border: none;
   border-radius: ${({ theme }) => theme.radiusSm};
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.2s;
   
@@ -152,62 +211,70 @@ const CreateRoomButton = styled.button`
     filter: brightness(1.1);
     transform: translateY(-1px);
   }
+
+  @media (min-width: 768px) {
+    padding: 14px;
+    font-size: 1rem;
+  }
 `;
 
 // Current Room styles
-const CurrentRoomHeader = styled.div`
-  background: rgba(240, 192, 32, 0.1);
-  border: 1px solid ${({ theme }) => theme.colors.gold};
-  border-radius: ${({ theme }) => theme.radius};
-  padding: 16px;
-  margin-bottom: 16px;
-`;
-
-const CurrentRoomTitle = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-`;
-
-const CurrentRoomName = styled.h3`
-  color: ${({ theme }) => theme.colors.gold};
-  font-size: 1.2rem;
+const BackButton = styled.button`
+  position: fixed;
+  left: 20px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  color: ${({ theme }) => theme.colors.text};
+  font-size: 1.4rem;
   display: flex;
   align-items: center;
-  gap: 8px;
-`;
-
-const CurrentRoomStats = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  font-size: 0.9rem;
-  color: ${({ theme }) => theme.colors.textDim};
-  margin-bottom: 12px;
-`;
-
-const CurrentRoomActions = styled.div`
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-`;
-
-const ActionButton = styled.button<{ $variant?: 'danger' | 'info' }>`
-  padding: 8px 16px;
-  background: ${({ $variant }) => 
-    $variant === 'danger' ? '#c0392b' : 
-    $variant === 'info' ? '#2980b9' : 
-    '#7f8c8d'};
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.85rem;
+  justify-content: center;
   cursor: pointer;
   transition: all 0.2s;
+  z-index: 50;
   
   &:hover {
-    filter: brightness(1.1);
+    background: rgba(0, 0, 0, 0.8);
+    border-color: ${({ theme }) => theme.colors.gold};
+    color: ${({ theme }) => theme.colors.gold};
+  }
+
+  @media (min-width: 768px) {
+    width: 52px;
+    height: 52px;
+    font-size: 1.5rem;
+  }
+`;
+
+const ShareButton = styled.button`
+  position: fixed;
+  right: 20px;
+  top: 76px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(41, 128, 185, 0.9);
+  border: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  z-index: 50;
+  
+  &:hover {
+    background: rgba(41, 128, 185, 1);
+    transform: scale(1.05);
+  }
+
+  @media (min-width: 768px) {
+    top: 84px;
+    width: 48px;
+    height: 48px;
   }
 `;
 
@@ -300,6 +367,7 @@ interface GrandWagerProps {
   config: RoomConfig | null;
   currentRoom: Room | null;
   availableRooms: Room[];
+  myRooms: Room[];
   playerId: string | null;
   timeRemaining: number;
   betAmount: string;
@@ -326,6 +394,7 @@ const GrandWager: React.FC<GrandWagerProps> = ({
   config,
   currentRoom,
   availableRooms,
+  myRooms,
   playerId,
   timeRemaining,
   betAmount,
@@ -343,7 +412,7 @@ const GrandWager: React.FC<GrandWagerProps> = ({
   const [joinCode, setJoinCode] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
-  
+
   // Create room form state
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomMinBet, setNewRoomMinBet] = useState('10');
@@ -373,17 +442,17 @@ const GrandWager: React.FC<GrandWagerProps> = ({
 
   const handleCreateRoom = () => {
     if (!newRoomName.trim()) return;
-    
+
     const roundDurationSec = parseInt(newRoomRoundDuration) || 60;
     const clampedDuration = Math.max(10, Math.min(600, roundDurationSec));
-    
+
     onRoomCreate({
       name: newRoomName.trim(),
       minBet: parseInt(newRoomMinBet) || 10,
       maxBet: parseInt(newRoomMaxBet) || 1000,
       roundDurationMs: clampedDuration * 1000,
     });
-    
+
     setShowCreateModal(false);
     setNewRoomName('');
   };
@@ -392,42 +461,24 @@ const GrandWager: React.FC<GrandWagerProps> = ({
 
   // If in a room, show the game
   if (currentRoom) {
+    const handleBack = () => {
+      if (isCreator) {
+        onRoomClose(currentRoom.id);
+      } else {
+        onRoomLeave();
+      }
+    };
+
     return (
       <GrandWagerWrapper>
-        <CurrentRoomHeader>
-          <CurrentRoomTitle>
-            <CurrentRoomName>
-              {currentRoom.name}
-              {currentRoom.type === 'private' && ' 🔒'}
-            </CurrentRoomName>
-          </CurrentRoomTitle>
-          <CurrentRoomStats>
-            <span>👥 {currentRoom.playerCount} w pokoju</span>
-            <span>🎲 {currentRoom.currentBetterCount || 0}/{currentRoom.maxPlayers} graczy</span>
-            <span>💰 ${config?.minBet || currentRoom.minBet} - ${config?.maxBet || currentRoom.maxBet}</span>
-          </CurrentRoomStats>
-          <CurrentRoomActions>
-            {currentRoom.inviteCode && (
-              <>
-                <ActionButton $variant="info" onClick={() => setShowQRModal(true)}>
-                  📱 QR Kod
-                </ActionButton>
-                <span style={{ color: '#888', fontSize: '0.85rem', alignSelf: 'center' }}>
-                  Kod: <strong style={{ color: '#f1c40f' }}>{currentRoom.inviteCode}</strong>
-                </span>
-              </>
-            )}
-            {isCreator ? (
-              <ActionButton $variant="danger" onClick={() => onRoomClose(currentRoom.id)}>
-                Zamknij pokój
-              </ActionButton>
-            ) : (
-              <ActionButton onClick={onRoomLeave}>
-                Opuść pokój
-              </ActionButton>
-            )}
-          </CurrentRoomActions>
-        </CurrentRoomHeader>
+        <BackButton onClick={handleBack} title={isCreator ? 'Zamknij pokój' : 'Opuść pokój'}>
+          <ArrowLeftIcon />
+        </BackButton>
+        {currentRoom.inviteCode && (
+          <ShareButton onClick={() => setShowQRModal(true)} title="Udostępnij pokój">
+            <ShareIcon />
+          </ShareButton>
+        )}
 
         <BetWheel
           bets={currentRound?.bets || []}
@@ -458,14 +509,14 @@ const GrandWager: React.FC<GrandWagerProps> = ({
               <p style={{ color: '#aaa', marginBottom: '16px' }}>
                 Zeskanuj kod QR aby dołączyć do pokoju <strong>{currentRoom.name}</strong>
               </p>
-              <div style={{ 
-                background: 'white', 
-                padding: '16px', 
-                borderRadius: '8px', 
+              <div style={{
+                background: 'white',
+                padding: '16px',
+                borderRadius: '8px',
                 display: 'inline-block',
                 marginBottom: '16px'
               }}>
-                <QRCodeSVG 
+                <QRCodeSVG
                   value={`${window.location.origin}?roomCode=${currentRoom.inviteCode}`}
                   size={200}
                   level="H"
@@ -474,9 +525,9 @@ const GrandWager: React.FC<GrandWagerProps> = ({
               <p style={{ color: '#888', fontSize: '12px', marginBottom: '8px' }}>
                 Lub podziel się kodem:
               </p>
-              <p style={{ 
-                color: '#f1c40f', 
-                fontSize: '24px', 
+              <p style={{
+                color: '#f1c40f',
+                fontSize: '24px',
                 fontWeight: 'bold',
                 letterSpacing: '4px',
                 marginBottom: '16px'
@@ -496,12 +547,33 @@ const GrandWager: React.FC<GrandWagerProps> = ({
   // Dashboard - no room selected
   return (
     <GrandWagerWrapper>
-      <DashboardTitle>🎰 Grand Wager</DashboardTitle>
-      <DashboardSubtitle>Dołącz do pokoju publicznego lub stwórz własny pojedynek 1v1</DashboardSubtitle>
+      {publicRooms.length === 0 ? (
+        <p style={{ color: '#888', textAlign: 'center', padding: '20px' }}>
+          Brak dostępnych pokojów publicznych
+        </p>
+      ) : (
+        <RoomsGrid>
+          {publicRooms.map(room => (
+            <RoomCard key={room.id} onClick={() => onRoomJoin(room.id)}>
+              <RoomName>{room.name}</RoomName>
+              <RoomStats>
+                <RoomStat>🎲 {room.currentBetterCount || 0}/{room.maxPlayers} graczy</RoomStat>
+                <RoomStat>💰 ${room.minBet}-${room.maxBet}</RoomStat>
+                <RoomStat>⏱️ {room.roundDurationMs / 1000}s</RoomStat>
+              </RoomStats>
+              <JoinButton>Dołącz do gry</JoinButton>
+            </RoomCard>
+          ))}
+        </RoomsGrid>
+      )}
 
-      {/* Join by code */}
+      <Divider>
+        <DividerLine />
+        <DividerText>⚔️ 1v1</DividerText>
+        <DividerLine />
+      </Divider>
+
       <JoinCodeSection>
-        <SectionTitle>🔑 Dołącz przez kod</SectionTitle>
         <JoinCodeRow>
           <JoinCodeInput
             type="text"
@@ -517,46 +589,48 @@ const GrandWager: React.FC<GrandWagerProps> = ({
         </JoinCodeRow>
       </JoinCodeSection>
 
-      {/* Public rooms */}
-      <SectionTitle>🌐 Pokoje publiczne ({publicRooms.length})</SectionTitle>
-      {publicRooms.length === 0 ? (
-        <p style={{ color: '#888', textAlign: 'center', padding: '20px' }}>
-          Brak dostępnych pokojów publicznych
-        </p>
-      ) : (
-        <RoomsGrid>
-          {publicRooms.map(room => (
-            <RoomCard key={room.id} onClick={() => onRoomJoin(room.id)}>
-              <RoomName>{room.name}</RoomName>
-              <RoomStats>
-                <RoomStat>👥 {room.playerCount} w pokoju</RoomStat>
-                <RoomStat>🎲 {room.currentBetterCount || 0}/{room.maxPlayers} graczy</RoomStat>
-                <RoomStat>💰 ${room.minBet}-${room.maxBet}</RoomStat>
-                <RoomStat>⏱️ {room.roundDurationMs / 1000}s</RoomStat>
-              </RoomStats>
-              <JoinButton>Dołącz do gry</JoinButton>
-            </RoomCard>
-          ))}
-        </RoomsGrid>
-      )}
+      <Divider>
+        <DividerLine />
+        <DividerText>lub stwórz</DividerText>
+        <DividerLine />
+      </Divider>
 
-      {/* Create private room */}
       <CreateRoomSection>
-        <SectionTitle>⚔️ Stwórz pojedynek 1v1</SectionTitle>
-        <p style={{ color: '#888', fontSize: '0.9rem', marginBottom: '12px' }}>
-          Utwórz prywatny pokój i zaproś znajomego za pomocą kodu lub QR
-        </p>
         <CreateRoomButton onClick={() => setShowCreateModal(true)}>
           + Utwórz prywatny pokój
         </CreateRoomButton>
       </CreateRoomSection>
+
+      {/* My Rooms Section */}
+      {myRooms.length > 0 && (
+        <>
+          <Divider>
+            <DividerLine />
+            <DividerText>🔒 Moje pokoje</DividerText>
+            <DividerLine />
+          </Divider>
+          <RoomsGrid>
+            {myRooms.map(room => (
+              <RoomCard key={room.id} onClick={() => onRoomJoin(room.id)}>
+                <RoomName>🔒 {room.name}</RoomName>
+                <RoomStats>
+                  <RoomStat>👥 {room.playerCount}/2</RoomStat>
+                  <RoomStat>💰 ${room.minBet}-${room.maxBet}</RoomStat>
+                  <RoomStat>🔑 {room.inviteCode}</RoomStat>
+                </RoomStats>
+                <JoinButton>Wejdź do pokoju</JoinButton>
+              </RoomCard>
+            ))}
+          </RoomsGrid>
+        </>
+      )}
 
       {/* Create Room Modal */}
       {showCreateModal && (
         <ModalOverlay onClick={() => setShowCreateModal(false)}>
           <ModalContent onClick={e => e.stopPropagation()}>
             <ModalTitle>Nowy pojedynek 1v1</ModalTitle>
-            
+
             <ModalLabel>Nazwa pokoju</ModalLabel>
             <ModalInput
               type="text"
@@ -564,7 +638,7 @@ const GrandWager: React.FC<GrandWagerProps> = ({
               value={newRoomName}
               onChange={e => setNewRoomName(e.target.value)}
             />
-            
+
             <ModalLabel>Minimalny zakład ($)</ModalLabel>
             <ModalInput
               type="number"
@@ -572,7 +646,7 @@ const GrandWager: React.FC<GrandWagerProps> = ({
               value={newRoomMinBet}
               onChange={e => setNewRoomMinBet(e.target.value)}
             />
-            
+
             <ModalLabel>Maksymalny łączny zakład ($)</ModalLabel>
             <ModalInput
               type="number"
@@ -580,7 +654,7 @@ const GrandWager: React.FC<GrandWagerProps> = ({
               value={newRoomMaxBet}
               onChange={e => setNewRoomMaxBet(e.target.value)}
             />
-            
+
             <ModalLabel>Czas rundy (sekundy)</ModalLabel>
             <ModalInput
               type="number"
@@ -590,7 +664,7 @@ const GrandWager: React.FC<GrandWagerProps> = ({
               onChange={e => setNewRoomRoundDuration(e.target.value)}
               placeholder="60"
             />
-            
+
             <ModalButtonRow>
               <ModalButton onClick={() => setShowCreateModal(false)}>
                 Anuluj

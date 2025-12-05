@@ -224,3 +224,26 @@ export const DropdownItem = styled.button`
     background: ${({ theme }) => theme.colors.bgHover};
   }
 `;
+
+export const LeaveButton = styled.button`
+  padding: 6px 10px;
+  background: rgba(192, 57, 43, 0.2);
+  color: #e74c3c;
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  
+  &:hover {
+    background: rgba(192, 57, 43, 0.35);
+    border-color: rgba(231, 76, 60, 0.5);
+  }
+
+  @media (min-width: 768px) {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+`;

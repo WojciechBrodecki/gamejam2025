@@ -10,6 +10,7 @@ export interface Config {
   minBet: number;
   maxBet: number;
   jwtSecret: string;
+  maxPrivateRoomsPerPlayer: number;
 }
 
 export const config: Config = {
@@ -20,4 +21,5 @@ export const config: Config = {
   minBet: parseInt(process.env.MIN_BET || '1', 10),
   maxBet: parseInt(process.env.MAX_BET || '10000', 10),
   jwtSecret: process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production',
+  maxPrivateRoomsPerPlayer: parseInt(process.env.MAX_PRIVATE_ROOMS_PER_PLAYER || '2', 10),
 };

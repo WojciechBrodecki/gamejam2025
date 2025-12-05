@@ -98,6 +98,12 @@ export class RoomService {
       throw new Error('Players can only create private rooms');
     }
 
+    // Check if player has reached max private rooms limit
+    const playerRoomsCount = await this.getPlayerActiveRoomsCount(options.creatorId);
+    if (playerRoomsCount >= config.maxPrivateRoomsPerPlayer) {
+      throw new Error(`You can only have ${config.maxPrivateRoomsPerPlayer} active private rooms at a time`);
+    }
+
     const roomId = uuidv4();
     
     // Private rooms always have exactly 2 players
@@ -725,6 +731,24 @@ export class RoomService {
       status: room.status,
       createdAt: room.createdAt,
     };
+  }
+
+  // Get all active private rooms created by a specific player
+  async getPlayerCreatedRooms(playerId: string): Promise<IRoom[]> {
+    return Room.find({ 
+      creatorId: playerId, 
+      type: 'private',
+      status: { $ne: 'closed' } 
+    }).sort({ createdAt: -1 });
+  }
+
+  // Get count of active private rooms for a player
+  async getPlayerActiveRoomsCount(playerId: string): Promise<number> {
+    return Room.countDocuments({ 
+      creatorId: playerId, 
+      type: 'private',
+      status: { $ne: 'closed' } 
+    });
   }
 }
 
