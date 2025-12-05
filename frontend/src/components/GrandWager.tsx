@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 import { QRCodeSVG } from 'qrcode.react';
 import { Player, RoomConfig, Round, Room } from '../types';
+import { BASE_PATH } from '../config';
 import BetWheel from './BetWheel';
 import BetPanel from './BetPanel';
 
@@ -616,7 +617,7 @@ const GrandWager: React.FC<GrandWagerProps> = ({
                 marginBottom: '16px'
               }}>
                 <QRCodeSVG
-                  value={`${window.location.origin}?roomCode=${currentRoom.inviteCode}`}
+                  value={`${window.location.origin}${BASE_PATH}?roomCode=${currentRoom.inviteCode}`}
                   size={200}
                   level="H"
                 />

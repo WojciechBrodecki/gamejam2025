@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import { createServer } from 'http';
 import mongoose from 'mongoose';
 import { config } from './config';
@@ -15,9 +16,15 @@ const PORT = 5001;
 app.use(cors());
 app.use(express.json());
 
+// Serve static frontend files in production
+if (process.env.NODE_ENV === 'production') {
+  const frontendPath = path.join(__dirname, '../../frontend/dist');
+  app.use(express.static(frontendPath));
+}
+
 // Routes
-app.get('/', (req, res) => {
-  res.send('hello world from BE');
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
 });
 
 app.use('/api', apiRoutes);
@@ -39,6 +46,14 @@ const DEFAULT_ROOMS = [
     roundDurationMs: 10 * 1000, // 2 minutes
   },
 ];
+
+// SPA fallback - serve index.html for all non-API routes in production
+if (process.env.NODE_ENV === 'production') {
+  const frontendPath = path.join(__dirname, '../../frontend/dist');
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  });
+}
 
 // Connect to MongoDB and start server
 async function start(): Promise<void> {
